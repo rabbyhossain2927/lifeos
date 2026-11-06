@@ -8,7 +8,7 @@ class DefaultFirebaseOptions {
     apiKey: 'PASTE-WEB-API-KEY', // "Web API Key"
     appId: 'PASTE-APP-ID', // looks like 1:1234567890:android:abc123...
     messagingSenderId: 'PASTE-PROJECT-NUMBER', // "Project number"
-    projectId: 'PASTE-PROJECT-ID', // "Project ID"
+    projectId: 'lifeos-33ef6', // "Project ID"
   );
 
   static bool get configured => !android.apiKey.startsWith('PASTE');
