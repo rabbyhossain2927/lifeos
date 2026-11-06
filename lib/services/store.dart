@@ -8,6 +8,20 @@ import 'api.dart';
 
 typedef Json = Map<String, dynamic>;
 
+/// PHP turns an empty JSON object {} into [] on its way back from the server.
+/// These fields are always maps, so an empty list there means an empty map.
+const _mapFields = {'logs', 'duas', 'reset', 'license'};
+
+Json cleanDoc(Object? raw) {
+  if (raw is! Map) return <String, dynamic>{};
+  return {
+    for (final e in raw.entries)
+      '${e.key}': _mapFields.contains(e.key) && e.value is List
+          ? <String, dynamic>{}
+          : (e.value is Map ? cleanDoc(e.value) : e.value),
+  };
+}
+
 const _uuid = Uuid();
 String newId() => _uuid.v4();
 
@@ -58,7 +72,7 @@ class Store extends ChangeNotifier {
         final j = jsonDecode(await _file!.readAsString()) as Json;
         (j['data'] as Map? ?? {}).forEach((col, docs) {
           _data[col as String] = {
-            for (final e in (docs as Map).entries) e.key as String: Map<String, dynamic>.from(e.value as Map)
+            for (final e in (docs as Map).entries) e.key as String: cleanDoc(e.value)
           };
         });
         (j['outbox'] as Map? ?? {}).forEach((k, v) => _outbox[k as String] = Map<String, dynamic>.from(v as Map));
@@ -208,7 +222,7 @@ class Store extends ChangeNotifier {
           if (m['deleted'] == true || m['data'] == null) {
             _data[col]?.remove(id);
           } else {
-            (_data[col] ??= {})[id] = Map<String, dynamic>.from(m['data'] as Map);
+            (_data[col] ??= {})[id] = cleanDoc(m['data']);
           }
           got = true;
         }

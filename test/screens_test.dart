@@ -50,6 +50,9 @@ void main() {
       tester.view.physicalSize = const Size(1080, 2340);
       tester.view.devicePixelRatio = 2.75;
       final store = Store('test');
+      // Like data coming back from the PHP server: empty maps arrive as [].
+      store.add('habits', {'name': 'Read', 'logs': cleanDoc({'logs': []})['logs']});
+      store.add('goals', cleanDoc({'title': 'Read 24 books', 'target': 24, 'unit': 'books', 'logs': []}));
       final errors = <String>[];
       final old = FlutterError.onError;
       FlutterError.onError = (d) => errors.add('${d.exceptionAsString()}\n${d.stack.toString().split('\n').take(8).join('\n')}');
@@ -68,3 +71,4 @@ void main() {
     });
   }
 }
+
