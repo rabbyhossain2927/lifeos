@@ -32,7 +32,7 @@ jobs:
       - name: Build every screen (catches grey-screen crashes)
         run: |
           set -o pipefail
-          if ! flutter test test/screens_test.dart 2>&1 | tee test.txt; then
+          if ! flutter test 2>&1 | tee test.txt; then
             grep -E "^=== |Exception|Error|was thrown|\.dart:[0-9]+" test.txt | grep -v "^\s*$" | head -60 | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
