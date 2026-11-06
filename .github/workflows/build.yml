@@ -24,7 +24,8 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Pinned: newer runner images have killed Flutter APK builds before.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
