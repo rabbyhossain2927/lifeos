@@ -12,7 +12,7 @@ class Config {
 
   /// Firebase console > Authentication > Sign-in method > Google >
   /// "Web SDK configuration" > Web client ID. Ends with .apps.googleusercontent.com
-  static const googleWebClientId = 'PASTE-WEB-CLIENT-ID.apps.googleusercontent.com';
+  static const googleWebClientId = '129849048034-l26uu36gnc3177c33grkn3upsaetqb3t.apps.googleusercontent.com';
 
   /// Your shop's License API (shop admin > Settings > License API).
   static const licenseApi = 'https://shop.rabbyhossain.com/api/license';

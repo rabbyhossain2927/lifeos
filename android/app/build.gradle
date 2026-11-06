@@ -29,7 +29,8 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.rabby.lifeos"
+        // Must match the Android app registered in Firebase (Google sign-in checks it).
+        applicationId = "com.rabby"
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

@@ -27,7 +27,7 @@ You don't need a computer program, Flutter or Android Studio. GitHub builds the 
    - Tap **Google** again, open **Web SDK configuration**, and copy the **Web client ID** (it ends with `.apps.googleusercontent.com`). Keep it for Part 3.
 4. You do **not** need Firestore or Realtime Database. Your data goes to your own server (Part 2).
 5. Go to the project home (house icon) and tap the **Android** icon (**Add app**):
-   - **Android package name:** `com.rabby.lifeos` (exactly this)
+   - **Android package name:** `com.rabby` (exactly this)
    - **App nickname:** LifeOS
    - **Debug signing certificate SHA-1:** paste the **SHA-1** from `LifeOS-signing-secrets.txt`
    - Tap **Register app**. **Skip** the download of google-services.json and **skip** the next steps (tap Next, Next, Continue to console).

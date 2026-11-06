@@ -6,8 +6,8 @@ import 'package:firebase_core/firebase_core.dart';
 class DefaultFirebaseOptions {
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'PASTE-WEB-API-KEY', // "Web API Key"
-    appId: 'PASTE-APP-ID', // looks like 1:1234567890:android:abc123...
-    messagingSenderId: 'PASTE-PROJECT-NUMBER', // "Project number"
+    appId: '1:129849048034:android:0c813edbe28a6955cb17bb', // looks like 1:1234567890:android:abc123...
+    messagingSenderId: '129849048034', // "Project number"
     projectId: 'lifeos-33ef6', // "Project ID"
   );
 
