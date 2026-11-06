@@ -45,16 +45,17 @@ You don't need a computer program, Flutter or Android Studio. GitHub builds the 
    - New user with a strong password (save it).
    - **Add user to database** → tick **ALL PRIVILEGES** → **Make changes**.
 2. **Get the server files.** On your phone/PC open `github.com/rabbyhossain2927/lifeos` → green **Code** button → **Download ZIP**.
-3. **Upload.** cPanel → **File Manager** → open `public_html` → **Upload** the ZIP → right-click it → **Extract**.
-   Then move the folder `lifeos-main/server/lifeos-api` so it sits at **`public_html/lifeos-api`**. Delete the rest of the extracted folder and the ZIP.
-   Check the hidden `.htaccess` file came along: **Settings → Show hidden files**. You should see `public_html/lifeos-api/cache/.htaccess`.
-4. **Settings file.** In `lifeos-api`, copy `config.sample.php` and name the copy `config.php`. Edit it:
+3. **The subdomain.** cPanel → **Domains** (or **Subdomains**) → make sure **lifeos.rabbyhossain.com** exists and note its **Document Root** folder (for example `lifeos.rabbyhossain.com` or `public_html/lifeos`). Then cPanel → **SSL/TLS Status** → tick it → **Run AutoSSL**, so it opens with `https://`.
+4. **Upload.** cPanel → **File Manager** → open the subdomain's Document Root folder → **Upload** the ZIP → right-click it → **Extract**.
+   Open `lifeos-main/server/lifeos-api`, **Select all** (turn on **Settings → Show hidden files** first, so `.htaccess` and `.user.ini` are included) → **Move** them into the Document Root folder itself. Delete the empty `lifeos-main` folder and the ZIP.
+   The Document Root should now hold `sync.php`, `lib.php`, `.htaccess`, the `cache` folder and the rest.
+5. **Settings file.** In the Document Root, copy `config.sample.php` and name the copy `config.php`. Edit it:
    - `db_name` and `db_user`: the FULL names from step 1
    - `db_pass`: the password from step 1
    - `firebase_project_id`: the **Project ID** from Part 1, step 7
    - Save.
-5. **Create the table.** Open `https://rabbyhossain.com/lifeos-api/install.php` in your browser. It must say `"ok":true`. Then **delete `install.php`** in File Manager.
-6. **Check it.** Open `https://rabbyhossain.com/lifeos-api/health.php`. The last line must say `"all_good":true`.
+6. **Create the table.** Open `https://lifeos.rabbyhossain.com/install.php` in your browser. It must say `"ok":true`. Then **delete `install.php`** in File Manager.
+7. **Check it.** Open `https://lifeos.rabbyhossain.com/health.php`. The last line must say `"all_good":true`.
    - `google_keys` false → ask hosting support to allow outgoing HTTPS to `www.googleapis.com`.
    - `cache_writable` false → set folder `cache` permission to 755.
 
@@ -139,7 +140,7 @@ On another phone, install the same APK and sign in with the same Google account:
 - **Google sign-in error 10 / DEVELOPER_ERROR:** the SHA-1 or SHA-256 in Firebase is wrong or missing (Part 1, steps 5–6), or the app was built without the `SIGNING_PASSWORD` secret (Part 4).
 - **Profile → Sync says "Token is for another Firebase project":** `firebase_project_id` in `config.php` must be your Project ID.
 - **Sync says "Database connection failed":** check `db_name`, `db_user`, `db_pass` in `config.php` (use the full cPanel names).
-- **Server replies with a web page instead of data:** your hosting firewall (Imunify360 / Cloudflare) blocks it. Ask support to whitelist `/lifeos-api/`.
+- **Server replies with a web page instead of data:** your hosting firewall (Imunify360 / Cloudflare) blocks it. Ask support to whitelist `lifeos.rabbyhossain.com`.
 - **Update downloads but "App not installed":** a build was signed with a different key. Always keep the same `SIGNING_PASSWORD` secret and never change the `.enc` file.
 - **Build has a red ✗ with "Add the SIGNING_PASSWORD secret":** do Part 4.
 - **License says it can't reach the shop:** check `shop.rabbyhossain.com/api/license/check?key=TEST` opens in a browser.

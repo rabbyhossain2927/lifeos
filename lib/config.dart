@@ -2,9 +2,9 @@
 class Config {
   static const appName = 'LifeOS';
 
-  /// Your own sync server: the lifeos-api folder you uploaded to your hosting
-  /// (must be https). See docs/SETUP-GUIDE.md, Part 2.
-  static const apiBase = 'https://rabbyhossain.com/lifeos-api';
+  /// Your own sync server: the lifeos-api files on the lifeos.rabbyhossain.com
+  /// subdomain (must be https). See docs/SETUP-GUIDE.md, Part 2.
+  static const apiBase = 'https://lifeos.rabbyhossain.com';
 
   /// The public GitHub repo. The app reads its latest Release to find updates.
   static const githubOwner = 'rabbyhossain2927';
