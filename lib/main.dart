@@ -17,6 +17,17 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent, statusBarIconBrightness: Brightness.dark));
   await Local.init();
+  // A screen that crashes shows what went wrong (send a screenshot) instead of a grey box.
+  ErrorWidget.builder = (d) => Material(
+        color: const Color(0xFFF1EEF4),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('This part of the screen hit a problem. Please send a screenshot.\n\n${d.exceptionAsString()}',
+                style: const TextStyle(fontFamily: 'Geist', fontSize: 13, color: Color(0xFF5F6368))),
+          ),
+        ),
+      );
   try {
     await NotifyService.init();
   } catch (_) {}
