@@ -1,0 +1,109 @@
+name: Build & release LifeOS
+
+# How to publish an update (docs/SETUP-GUIDE.md, Part 7):
+#   1. Write what changed in RELEASE_NOTES.md
+#   2. Actions tab > "Build & release LifeOS" > Run workflow > type the new version (e.g. 1.0.3)
+#      (or push a git tag like v1.0.3)
+#   3. This builds the APK and publishes a GitHub Release.
+#      Every installed LifeOS sees it and shows "Update ready".
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version, e.g. 1.0.3 (must be higher than the last one)'
+        required: true
+      publish:
+        description: 'Publish it so phones get the update'
+        type: boolean
+        default: true
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.1'
+          channel: stable
+          cache: true
+
+      - name: Add the standard Android project files
+        # Only creates files that are missing; our own build.gradle,
+        # AndroidManifest.xml and icons are kept.
+        run: |
+          flutter create --org com.rabby --project-name lifeos --platforms=android .
+          rm -rf test
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[0-9.]*"/id "org.jetbrains.kotlin.android" version "2.0.21"/' android/settings.gradle
+
+      - name: Unlock the signing key
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          P="$(printf %s "$SIGNING_PASSWORD" | tr -d ' \r\n\t')"
+          if [ -z "$P" ]; then
+            if [[ "${{ github.event_name }}" == "push" || "${{ github.event.inputs.publish }}" == "true" ]]; then
+              echo "::error::Add the SIGNING_PASSWORD secret (Settings > Secrets and variables > Actions) before publishing. See docs/SETUP-GUIDE.md Part 4."
+              exit 1
+            fi
+            echo "::warning::No SIGNING_PASSWORD secret - test build with a temporary key (not published)."
+            exit 0
+          fi
+          if ! openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in android/app/upload-keystore.jks.enc -out android/app/upload-keystore.jks -pass pass:"$P" 2>/dev/null; then
+            echo "::error::SIGNING_PASSWORD is wrong. Copy it again from LifeOS-signing-secrets.txt."
+            exit 1
+          fi
+          SHA1=$(keytool -list -v -keystore android/app/upload-keystore.jks -storepass "$P" -alias lifeos | grep -m1 "SHA1:" | sed 's/.*SHA1: //')
+          echo "::notice::Signing key OK. SHA-1 $SHA1 (this must match Firebase)."
+          printf 'storeFile=upload-keystore.jks\nstorePassword=%s\nkeyAlias=lifeos\nkeyPassword=%s\n' "$P" "$P" > android/key.properties
+
+      - name: Work out the version
+        id: ver
+        run: |
+          V="${{ github.event.inputs.version }}"
+          if [[ -z "$V" && "$GITHUB_REF_TYPE" == "tag" ]]; then V="${GITHUB_REF_NAME}"; fi
+          V="${V#v}"
+          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "::error::Version must look like 1.0.3 (got '$V')"; exit 1; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - run: flutter pub get
+
+      - name: Build APK
+        run: |
+          set -o pipefail
+          if ! flutter build apk --release --target-platform android-arm,android-arm64 --build-name="${{ steps.ver.outputs.version }}" --build-number="${{ github.run_number }}" 2>&1 | tee build.log; then
+            grep -E "error:|Error:|FAILURE|What went wrong|Execution failed" build.log | head -25 | while IFS= read -r l; do echo "::error::$l"; done
+            grep -A6 "What went wrong" build.log | head -14 | tr '\n' ' ' | sed 's/^/::error::/' ; echo
+            exit 1
+          fi
+
+      - name: Name the APK
+        run: cp build/app/outputs/flutter-apk/app-release.apk "LifeOS-v${{ steps.ver.outputs.version }}.apk"
+
+      - name: Keep the APK as a download on this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeOS-v${{ steps.ver.outputs.version }}
+          path: LifeOS-v${{ steps.ver.outputs.version }}.apk
+
+      - name: Publish the GitHub Release (this is what the app checks)
+        if: github.event_name == 'push' || github.event.inputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: LifeOS ${{ steps.ver.outputs.version }}
+          make_latest: true
+          body_path: RELEASE_NOTES.md
+          files: LifeOS-v${{ steps.ver.outputs.version }}.apk

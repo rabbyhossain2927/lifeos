@@ -1,0 +1,34 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub-cache/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+.vscode/
+pubspec.lock
+
+# Android build files (CI recreates these)
+android/.gradle/
+android/local.properties
+android/gradlew
+android/gradlew.bat
+android/gradle/
+android/settings.gradle
+android/build.gradle
+android/gradle.properties
+android/app/src/main/kotlin/
+android/app/src/main/java/
+android/app/src/debug/
+android/app/src/profile/
+
+# The signing key is only stored encrypted (upload-keystore.jks.enc)
+*.jks
+*.keystore
+android/key.properties
+
+# Server settings with your database password
+server/lifeos-api/config.php
+server/lifeos-api/cache/*.json
