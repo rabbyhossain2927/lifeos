@@ -1,34 +1,47 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import '../services/license_service.dart';
+import '../services/life.dart';
 import '../services/local.dart';
 import '../services/notify_service.dart';
+import '../services/store.dart';
 import '../services/update_service.dart';
+import '../widgets/kit.dart';
+import '../widgets/motion.dart';
 import '../widgets/ui.dart';
+import 'account.dart';
 import 'add_sheet.dart';
 import 'explore.dart';
 import 'goals.dart';
-import 'habits.dart';
-import 'journal.dart';
-import 'today.dart';
+import 'home.dart';
 import 'update_screen.dart';
 
-/// The five tabs, the floating pill nav bar and the lime + button.
+/// Four tabs, the floating pill nav and the lime + button.
 class Shell extends StatefulWidget {
   const Shell({super.key});
   @override
   State<Shell> createState() => _ShellState();
 }
 
-class _ShellState extends State<Shell> with WidgetsBindingObserver {
+class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   int tab = 0;
+  late final AnimationController _fade = AnimationController(vsync: this, duration: const Duration(milliseconds: 320), value: 1);
 
   static const _tabs = [
-    (Icons.home_outlined, 'Today'),
-    (Icons.track_changes_rounded, 'Goals'),
-    (Icons.check_box_outlined, 'Habits'),
-    (Icons.menu_book_outlined, 'Journal'),
-    (Icons.grid_view_rounded, 'Explore'),
+    (Icons.home_outlined, Icons.home_rounded, 'Home'),
+    (Icons.track_changes_outlined, Icons.track_changes_rounded, 'Goals'),
+    (Icons.grid_view_outlined, Icons.grid_view_rounded, 'Explore'),
+    (Icons.person_outline_rounded, Icons.person_rounded, 'Account'),
   ];
+
+  void go(int i) {
+    if (i == tab) return;
+    Haptic.select();
+    setState(() => tab = i);
+    _fade.forward(from: 0);
+  }
 
   @override
   void initState() {
@@ -39,6 +52,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       if (!mounted) return;
       final s = store(context, listen: false);
       await License.recheck(s);
+      await autoBackup(s);
       await _checkUpdate();
     });
   }
@@ -46,6 +60,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _fade.dispose();
     super.dispose();
   }
 
@@ -69,58 +84,67 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       if (u == null || !mounted) return;
       await NotifyService.showUpdate(u.version);
       if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (c) => AlertDialog(
-          backgroundColor: C.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Text('Update ready', style: t(20, w: w6)),
-          content: Text('LifeOS ${u.version} is here. ${u.summary}', style: t(14, c: C.muted, h: 1.4)),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(c), child: Text('Later', style: t(14, w: w6, c: C.muted))),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(c);
-                push(context, const UpdateScreen());
-              },
-              child: Text('Update now', style: t(14, w: w6)),
-            ),
-          ],
-        ),
-      );
+      Haptic.success();
+      showSheet(context, 'Update ready', (c, _) => Col([
+            Text('LifeOS ${u.version} is here. ${u.summary}', style: t(14, c: C.muted, h: 1.45)),
+            PressPill('Update now', onTap: () {
+              Navigator.pop(c);
+              push(context, const UpdateScreen());
+            }),
+            PressPill('Later', bg: C.chip, fg: C.ink, height: 50, onTap: () => Navigator.pop(c)),
+          ], space: 12));
     } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
     final pages = [
-      TodayTab(onTab: (i) => setState(() => tab = i)),
+      HomeTab(onTab: go),
       const GoalsTab(),
-      const HabitsTab(),
-      const JournalTab(),
       const ExploreTab(),
+      const AccountTab(),
     ];
+    final fade = CurvedAnimation(parent: _fade, curve: Curves.easeOutCubic);
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(gradient: bgGradient),
         child: Stack(children: [
-          Positioned.fill(child: SafeArea(bottom: false, child: IndexedStack(index: tab, children: pages))),
-          // The + button sits above the nav bar, on the right.
-          Positioned(
+          Positioned.fill(
+            child: SafeArea(
+              bottom: false,
+              child: FadeTransition(
+                opacity: fade,
+                child: SlideTransition(
+                  position: Tween(begin: const Offset(0, 0.02), end: Offset.zero).animate(fade),
+                  child: IndexedStack(index: tab, children: pages),
+                ),
+              ),
+            ),
+          ),
+          // + above the nav, right side, on Home and Goals.
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 320),
+            curve: Curves.easeOutBack,
             right: 20,
-            bottom: 104 + MediaQuery.of(context).padding.bottom,
-            child: Semantics(
-              button: true,
-              label: 'Add',
-              child: Material(
-                color: C.lime,
-                shape: const CircleBorder(),
-                elevation: 6,
-                shadowColor: const Color(0x33111111),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => showAddSheet(context),
-                  child: const SizedBox(width: 60, height: 60, child: Icon(Icons.add_rounded, size: 28, color: C.ink)),
+            bottom: (tab <= 1 ? 104 : 40) + bottom,
+            child: AnimatedScale(
+              scale: tab <= 1 ? 1 : 0,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutBack,
+              child: Press(
+                onTap: () => tab == 1 ? addGoalPage(context) : showAddSheet(context),
+                label: tab == 1 ? 'Add goal' : 'Add',
+                scale: 0.9,
+                child: Container(
+                  width: 62,
+                  height: 62,
+                  decoration: const BoxDecoration(
+                    color: C.lime,
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: Color(0x29111111), blurRadius: 24, offset: Offset(0, 8))],
+                  ),
+                  child: const Icon(Icons.add_rounded, size: 30, color: C.ink),
                 ),
               ),
             ),
@@ -128,7 +152,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           Positioned(
             left: 16,
             right: 16,
-            bottom: 20 + MediaQuery.of(context).padding.bottom,
+            bottom: 18 + bottom,
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
@@ -136,31 +160,51 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                 borderRadius: BorderRadius.circular(999),
                 boxShadow: const [BoxShadow(color: Color(0x14111111), blurRadius: 24, offset: Offset(0, 8))],
               ),
-              child: Row(children: [
-                for (var i = 0; i < _tabs.length; i++)
-                  Expanded(
-                    child: Semantics(
-                      selected: i == tab,
-                      button: true,
-                      label: _tabs[i].$2,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => setState(() => tab = i),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOutCubic,
-                          height: 56,
-                          decoration: BoxDecoration(color: i == tab ? C.ink : Colors.transparent, borderRadius: BorderRadius.circular(999)),
-                          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            Icon(_tabs[i].$1, size: 20, color: i == tab ? C.white : C.muted),
-                            const SizedBox(height: 3),
-                            Text(_tabs[i].$2, style: t(11, w: i == tab ? w6 : w5, c: i == tab ? C.white : C.muted)),
-                          ]),
-                        ),
-                      ),
+              child: LayoutBuilder(builder: (context, box) {
+                final w = (box.maxWidth - 12) / _tabs.length;
+                return SizedBox(
+                  height: 58,
+                  child: Stack(children: [
+                    // The black pill slides to the chosen tab.
+                    AnimatedPositioned(
+                      duration: const Duration(milliseconds: 360),
+                      curve: Curves.easeOutBack,
+                      left: tab * (w + 4),
+                      top: 0,
+                      bottom: 0,
+                      width: w,
+                      child: Container(decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(999))),
                     ),
-                  ),
-              ]),
+                    Row(children: gap([
+                      for (var i = 0; i < _tabs.length; i++)
+                        Expanded(
+                          child: Semantics(
+                            selected: i == tab,
+                            button: true,
+                            label: _tabs[i].$3,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => go(i),
+                              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 200),
+                                  transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+                                  child: Icon(i == tab ? _tabs[i].$2 : _tabs[i].$1, key: ValueKey(i == tab), size: 20, color: i == tab ? C.white : C.muted),
+                                ),
+                                const SizedBox(height: 3),
+                                AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 200),
+                                  style: t(11, w: i == tab ? w6 : w5, c: i == tab ? C.white : C.muted),
+                                  child: Text(_tabs[i].$3),
+                                ),
+                              ]),
+                            ),
+                          ),
+                        ),
+                    ], 4)),
+                  ]),
+                );
+              }),
             ),
           ),
         ]),
@@ -169,39 +213,57 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   }
 }
 
-/// Top of a tab: small line + big title, optional right widget.
-class TabHeader extends StatelessWidget {
-  final String small, title;
-  final Widget? trailing;
-  const TabHeader({super.key, required this.small, required this.title, this.trailing});
-  @override
-  Widget build(BuildContext context) {
-    return Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-      Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(small, style: t(13, w: w5, c: C.muted)),
-          const SizedBox(height: 4),
-          Text(title, style: t(28, w: w6, ls: -0.6, h: 1.15)),
-        ]),
-      ),
-      if (trailing != null) trailing!,
-    ]);
-  }
-}
-
 /// Scrolling body of a tab, with room for the nav bar and + button.
 class TabBody extends StatelessWidget {
   final List<Widget> children;
-  final Future<void> Function()? onRefresh;
-  const TabBody({super.key, required this.children, this.onRefresh});
+  const TabBody({super.key, required this.children});
   @override
   Widget build(BuildContext context) {
-    final list = ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 190),
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: gap(children, 14),
-    );
     final s = store(context, listen: false);
-    return RefreshIndicator(color: C.ink, onRefresh: onRefresh ?? s.syncQuietly, child: list);
+    return RefreshIndicator(
+      color: C.ink,
+      onRefresh: () async {
+        Haptic.tap();
+        await s.syncQuietly();
+      },
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 190),
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: gap(stagger(children), 14),
+      ),
+    );
   }
+}
+
+/// Where the phone backup file goes: the Download folder when Android lets us,
+/// else the app's own folder.
+Future<File> backupFile() async {
+  final dl = Directory('/storage/emulated/0/Download');
+  try {
+    if (await dl.exists()) {
+      final f = File('${dl.path}/LifeOS-backup.json');
+      await f.writeAsString('', flush: true);
+      return f;
+    }
+  } catch (_) {}
+  final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
+  return File('${dir.path}/LifeOS-backup.json');
+}
+
+/// Writes all data to the phone. Returns the file.
+Future<File> backupToPhone(Store s) async {
+  final f = await backupFile();
+  await f.writeAsString(const JsonEncoder.withIndent(' ').convert(s.exportAll()), flush: true);
+  await Local.setLastBackup(DateTime.now().millisecondsSinceEpoch);
+  return f;
+}
+
+/// Once a day, if auto backup is on.
+Future<void> autoBackup(Store s) async {
+  if (s.settings['autoBackup'] == false) return;
+  if (DateTime.now().millisecondsSinceEpoch - Local.lastBackup < 20 * 3600 * 1000) return;
+  try {
+    await s.syncQuietly();
+    await backupToPhone(s);
+  } catch (_) {}
 }

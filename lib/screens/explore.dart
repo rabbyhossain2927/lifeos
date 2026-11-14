@@ -1,54 +1,10 @@
 import 'package:flutter/material.dart';
-import '../services/license_service.dart';
-import '../services/prayer.dart';
+import '../services/life.dart';
+import '../widgets/kit.dart';
+import '../widgets/motion.dart';
 import '../widgets/ui.dart';
-import 'daily.dart';
-import 'dates.dart';
-import 'deen.dart';
-import 'focus.dart';
-import 'food.dart';
-import 'health.dart';
-import 'learn.dart';
-import 'memory.dart';
-import 'pro.dart';
-import 'rewards.dart';
-import 'selfcare.dart';
 import 'shell.dart';
-import 'stats.dart';
-import 'travel.dart';
-
-class _Mod {
-  final String name, sub, feature;
-  final IconData icon;
-  final Widget Function() page;
-  final List<String> words;
-  const _Mod(this.name, this.sub, this.icon, this.page, {this.feature = '', this.words = const []});
-}
-
-final _groups = <String, List<_Mod>>{
-  'Body': [
-    _Mod('Health', 'Sleep, mood, weight, steps', Icons.monitor_heart_outlined, () => const HealthScreen(), words: ['sleep', 'mood', 'weight', 'steps']),
-    _Mod('Food', 'What I ate, calories, water', Icons.restaurant_outlined, () => const FoodScreen(), words: ['calories', 'kcal', 'meal', 'water']),
-    _Mod('Self care', 'Skin, hair, haircut, doctor', Icons.favorite_border_rounded, () => const SelfCareScreen(), words: ['skin', 'hair', 'haircut', 'doctor', 'cycle']),
-  ],
-  'Mind and time': [
-    _Mod('Focus', 'Pomodoro, do not disturb', Icons.timer_outlined, () => const FocusScreen(), words: ['pomodoro', 'timer', 'screen time']),
-    _Mod('Daily', 'Morning routine, reminders', Icons.wb_twilight_rounded, () => const DailyScreen(), words: ['routine', 'reminder', 'medicine', 'water', 'work']),
-    _Mod('Learn', 'Books, courses, skill hours', Icons.auto_stories_outlined, () => const LearnScreen(), words: ['book', 'course', 'skill']),
-  ],
-  'Faith': [
-    _Mod('Deen', 'Prayer times, duas, fasts', Icons.nightlight_round, () => const DeenScreen(), words: ['prayer', 'namaz', 'dua', 'dhikr', 'ramadan', 'fast', 'quran']),
-  ],
-  'Plans and people': [
-    _Mod('Dates', 'Birthdays, renewals, gifts', Icons.event_outlined, () => const DatesScreen(), words: ['birthday', 'renewal', 'gift', 'people']),
-    _Mod('Travel', 'Trips, packing, places', Icons.flight_takeoff_rounded, () => const TravelScreen(), feature: 'travel', words: ['trip', 'packing', 'ticket', 'place']),
-    _Mod('Memory', 'Photo of the day, timeline', Icons.photo_camera_outlined, () => const MemoryScreen(), feature: 'memory', words: ['photo', 'timeline', 'moment']),
-  ],
-  'Progress': [
-    _Mod('Report', 'Weekly score, streaks', Icons.bar_chart_rounded, () => const StatsScreen(), feature: 'report', words: ['score', 'streak', 'insight', 'review']),
-    _Mod('Rewards', 'Points, wins, notes', Icons.redeem_outlined, () => const RewardsScreen(), feature: 'rewards', words: ['points', 'win', 'future']),
-  ],
-};
+import 'tools.dart';
 
 class ExploreTab extends StatefulWidget {
   const ExploreTab({super.key});
@@ -57,99 +13,179 @@ class ExploreTab extends StatefulWidget {
 }
 
 class _ExploreTabState extends State<ExploreTab> {
-  String q = '';
+  final q = TextEditingController();
+  String group = 'All';
+  bool editing = false;
 
   @override
   Widget build(BuildContext context) {
     final s = store(context);
-    final loc = s.settings['city'] is List ? (s.settings['city'] as List).cast<num>() : const [23.8103, 90.4125];
-    final times = PrayerTimes.forDay(DateTime.now(), loc[0].toDouble(), loc[1].toDouble());
-    final next = PrayerTimes.next(loc[0].toDouble(), loc[1].toDouble());
-    final left = next.value.difference(DateTime.now());
-    final city = (s.settings['cityName'] ?? 'Dhaka').toString();
-    final ql = q.trim().toLowerCase();
-    bool match(_Mod m) => ql.isEmpty || m.name.toLowerCase().contains(ql) || m.sub.toLowerCase().contains(ql) || m.words.any((w) => w.contains(ql));
+    final pins = ((s.settings['pins'] as List?) ?? const []).map((e) => '$e').toList();
+    final find = q.text.trim().toLowerCase();
+    final next = s.nextPrayer;
+    final dates = upcomingDates(s);
+    final trip = nextTrip(s);
+    final tripFrom = DateTime.tryParse('${trip?['from'] ?? ''}');
+
+    final upcoming = <(String, String, String, bool, String)>[
+      ('Next prayer', '${next.key} · ${hmA(next.value)}', 'in ${_left(next.value)}', true, 'prayer'),
+      if (dates.isNotEmpty) ('Coming up', '${dates.first.$1['title']}', '${weekdaysLong[dates.first.$2.weekday - 1].substring(0, 3)}, ${shortDate(dates.first.$2)}', false, 'dates'),
+      if (trip != null) ('Trip', '${trip['place']}', tripFrom == null ? 'Soon' : '${tripFrom.difference(DateTime.now()).inDays.clamp(0, 9999)} days to go', false, 'travel'),
+    ];
+
+    final sections = [
+      for (final g in const [('Daily', 'Every day'), ('Grow', 'Grow'), ('Life', 'Life & people')])
+        if (group == 'All' || group == g.$1) (g.$2, tools.where((x) => x.group == g.$1 && (find.isEmpty || x.name.toLowerCase().contains(find))).toList()),
+    ].where((x) => x.$2.isNotEmpty).toList();
 
     return TabBody(children: [
-      TabHeader(small: '$city · ${shortDate(DateTime.now())}', title: 'Explore'),
-      Container(
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(color: C.white, borderRadius: BorderRadius.circular(999)),
-        child: Row(children: [
-          const Icon(Icons.search_rounded, size: 20, color: C.muted),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              onChanged: (v) => setState(() => q = v),
-              style: t(15),
-              decoration: InputDecoration(hintText: 'Search habits, dates, duas…', hintStyle: t(15, c: const Color(0xFF8A8A92)), border: InputBorder.none, isDense: true),
-            ),
-          ),
-        ]),
-      ),
-      if (ql.isEmpty)
-        Box(
-          onTap: () => push(context, const DeenScreen()),
-          child: Col([
-            CardHead('Prayer times', note: '${next.key} in ${left.inHours}h ${left.inMinutes % 60}m'),
-            Row(children: gap([
-              for (final n in PrayerTimes.names)
-                Expanded(
-                  child: Container(
-                    height: 56,
-                    decoration: BoxDecoration(color: n == next.key ? C.ink : C.chip, borderRadius: BorderRadius.circular(12)),
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Text(n, style: t(11, w: w5, c: n == next.key ? C.white : C.ink)),
-                      Text(hm(times[n]!), style: t(13, w: w6, c: n == next.key ? C.white : C.ink)),
-                    ]),
-                  ),
-                ),
-            ], 6)),
-          ]),
+      TabTitle('Explore', sub: 'All your tools in one place', trailing: HeadPill(editing ? 'Done' : 'Edit Home', dark: editing, onTap: () => setState(() => editing = !editing))),
+      TextField(
+        controller: q,
+        onChanged: (_) => setState(() {}),
+        style: t(15),
+        decoration: InputDecoration(
+          hintText: 'Find a tool…',
+          hintStyle: t(15, c: const Color(0xFF8A8A84)),
+          prefixIcon: const Icon(Icons.search_rounded, color: C.muted, size: 20),
+          filled: true,
+          fillColor: C.white,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide.none),
         ),
-      for (final e in _groups.entries)
-        if (e.value.any(match))
-          Col([
-            Padding(padding: const EdgeInsets.only(left: 4, top: 8), child: H2(e.key)),
-            Box(
-              radius: 24,
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-              child: Column(children: [
-                for (final m in e.value.where(match))
-                  _row(context, m, m == e.value.where(match).last),
-              ]),
+      ),
+      SizedBox(
+        height: 100,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
+          children: gap([
+            for (final u in upcoming)
+              Press(
+                onTap: () => openTool(context, u.$5),
+                label: u.$2,
+                child: Container(
+                  width: 168,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(color: u.$4 ? C.ink : C.white, borderRadius: BorderRadius.circular(22)),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(u.$1, style: t(12, w: w6, c: u.$4 ? C.lime : C.muted)),
+                    const SizedBox(height: 4),
+                    Text(u.$2, style: t(16, w: w6, c: u.$4 ? C.white : C.ink), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(u.$3, style: t(12, c: u.$4 ? C.darkMuted : C.muted)),
+                  ]),
+                ),
+              ),
+          ], 10),
+        ),
+      ),
+      SizedBox(
+        height: 42,
+        child: ListView(scrollDirection: Axis.horizontal, children: gap([
+          for (final g in const ['All', 'Daily', 'Grow', 'Life'])
+            Press(
+              onTap: () => setState(() => group = g),
+              haptic: Haptic.select,
+              label: g,
+              selected: g == group,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: g == group ? C.ink : C.white, borderRadius: BorderRadius.circular(999)),
+                child: Text(g, style: t(14, w: w6, c: g == group ? C.white : C.muted)),
+              ),
             ),
-          ], space: 8),
+        ], 8)),
+      ),
+      if (editing)
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: C.limeSoft, borderRadius: BorderRadius.circular(18)),
+          child: Text('Tap the star on a tool to show it on Home. ${pins.length} pinned.', style: t(13, c: C.limeText, h: 1.45)),
+        ),
+      for (final sec in sections)
+        Col([
+          Padding(padding: const EdgeInsets.only(left: 4, top: 4), child: Text(sec.$1, style: t(16, w: w6))),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.42,
+            children: [
+              for (var i = 0; i < sec.$2.length; i++)
+                Appear(
+                  index: i,
+                  child: Stack(children: [
+                    Positioned.fill(
+                      child: Press(
+                        onTap: () => openTool(context, sec.$2[i].key),
+                        label: sec.$2[i].name,
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(color: C.white, borderRadius: BorderRadius.circular(24)),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                            Hero(
+                              tag: 'tool-${sec.$2[i].name}',
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(color: sec.$2[i].colors.$1, borderRadius: BorderRadius.circular(14)),
+                                child: Icon(sec.$2[i].icon, size: 20, color: sec.$2[i].colors.$2),
+                              ),
+                            ),
+                            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(sec.$2[i].name, style: t(15, w: w6)),
+                              Text(sec.$2[i].status(s), style: t(12, c: C.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ]),
+                          ]),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: AnimatedScale(
+                        scale: editing ? 1 : 0,
+                        duration: const Duration(milliseconds: 260),
+                        curve: Curves.easeOutBack,
+                        child: Press(
+                          onTap: () {
+                            final k = sec.$2[i].key;
+                            s.setSetting('pins', pins.contains(k) ? (pins..remove(k)) : [...pins, k]);
+                          },
+                          haptic: Haptic.success,
+                          label: 'Pin ${sec.$2[i].name} to Home',
+                          selected: pins.contains(sec.$2[i].key),
+                          scale: 0.85,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: pins.contains(sec.$2[i].key) ? C.ink : C.white,
+                              shape: BoxShape.circle,
+                              border: pins.contains(sec.$2[i].key) ? null : Border.all(color: const Color(0xFFDAD8DF), width: 1.5),
+                            ),
+                            child: Icon(Icons.star_rounded, size: 18, color: pins.contains(sec.$2[i].key) ? C.lime : C.border),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ]),
+                ),
+            ],
+          ),
+        ], space: 10),
+      if (sections.isEmpty) Padding(padding: const EdgeInsets.all(30), child: Text('No tool called "${q.text}".', textAlign: TextAlign.center, style: t(14, c: C.muted))),
     ]);
   }
 
-  Widget _row(BuildContext context, _Mod m, bool last) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () => m.feature.isEmpty ? push(context, m.page()) : openPro(context, m.feature, m.page()),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 64),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(border: last ? null : const Border(bottom: BorderSide(color: C.line))),
-        child: Row(children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: C.chip, borderRadius: BorderRadius.circular(14)),
-            child: Icon(m.icon, size: 20, color: C.ink),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-              Text(m.name, style: t(15, w: w5)),
-              Text(m.sub, style: t(12, c: C.muted)),
-            ]),
-          ),
-          Icon(m.feature.isEmpty || License.isPro(store(context, listen: false)) ? Icons.chevron_right_rounded : Icons.lock_outline_rounded, size: 18, color: C.darkFaint),
-        ]),
-      ),
-    );
+  String _left(DateTime d) {
+    final m = d.difference(DateTime.now()).inMinutes.clamp(0, 99999);
+    return m >= 60 ? '${m ~/ 60}h ${m % 60}m' : '${m}m';
   }
 }
-

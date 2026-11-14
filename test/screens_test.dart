@@ -4,45 +4,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:lifeos/services/store.dart';
-import 'package:lifeos/screens/today.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lifeos/services/local.dart';
+import 'package:lifeos/screens/home.dart';
 import 'package:lifeos/screens/goals.dart';
-import 'package:lifeos/screens/habits.dart';
-import 'package:lifeos/screens/journal.dart';
+import 'package:lifeos/screens/goal_detail.dart';
 import 'package:lifeos/screens/explore.dart';
-import 'package:lifeos/screens/health.dart';
-import 'package:lifeos/screens/food.dart';
-import 'package:lifeos/screens/focus.dart';
-import 'package:lifeos/screens/daily.dart';
-import 'package:lifeos/screens/deen.dart';
-import 'package:lifeos/screens/learn.dart';
-import 'package:lifeos/screens/dates.dart';
-import 'package:lifeos/screens/travel.dart';
-import 'package:lifeos/screens/selfcare.dart';
-import 'package:lifeos/screens/rewards.dart';
-import 'package:lifeos/screens/stats.dart';
-import 'package:lifeos/screens/stuck.dart';
-import 'package:lifeos/screens/launch.dart';
+import 'package:lifeos/screens/account.dart';
+import 'package:lifeos/screens/tools.dart';
 
 void main() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await Local.init();
+  });
+
   final screens = <String, Widget Function()>{
-    'Today': () => TodayTab(onTab: (_) {}),
+    'Home': () => HomeTab(onTab: (_) {}),
     'Goals': () => const GoalsTab(),
-    'Habits': () => const HabitsTab(),
-    'Journal': () => const JournalTab(),
+    'Goal detail': () => const GoalDetail(id: 'g1'),
+    'New goal': () => const AddGoalPage(),
+    'Week review': () => const ReviewPage(),
     'Explore': () => const ExploreTab(),
-    'Health': () => const HealthScreen(),
-    'Food': () => const FoodScreen(),
-    'Focus': () => const FocusScreen(),
-    'Daily': () => const DailyScreen(),
-    'Deen': () => const DeenScreen(),
-    'Learn': () => const LearnScreen(),
-    'Dates': () => const DatesScreen(),
-    'Travel': () => const TravelScreen(),
-    'Self care': () => const SelfCareScreen(),
-    'Rewards': () => const RewardsScreen(),
-    'Report': () => const StatsScreen(),
-    'Stuck': () => const StuckScreen(),
-    'Launch': () => const LaunchScreen(task: 'Task', firstStep: 'Step'),
+    'Account': () => const AccountTab(),
+    for (final tl in tools) 'Tool ${tl.name}': tl.page,
   };
 
   for (final e in screens.entries) {
@@ -52,7 +37,14 @@ void main() {
       final store = Store('test');
       // Like data coming back from the PHP server: empty maps arrive as [].
       store.add('habits', {'name': 'Read', 'logs': cleanDoc({'logs': []})['logs']});
-      store.add('goals', cleanDoc({'title': 'Read 24 books', 'target': 24, 'unit': 'books', 'logs': []}));
+      store.save('goals', cleanDoc({'id': 'g1', 'title': 'Read 24 books', 'target': 24, 'unit': 'books', 'logUnit': 'pages', 'perUnit': 300, 'logs': [], 'steps': [{'t': 'Pick a book', 'min': '5 min', 'done': false}]}));
+      store.add('trips', cleanDoc({'place': 'Sylhet', 'from': '2099-01-01', 'to': '2099-01-03', 'packing': [], 'plan': []}));
+      store.add('courses', cleanDoc({'name': 'Arabic', 'total': 20, 'done': 3, 'logs': []}));
+      store.add('dates', cleanDoc({'title': 'Mom', 'date': '1970-12-01', 'yearly': true}));
+      store.add('moments', cleanDoc({'title': 'Trip', 'date': '2025-01-01'}));
+      store.add('care', cleanDoc({'name': 'Face wash', 'time': 'pm', 'logs': []}));
+      store.add('reminders', cleanDoc({'title': 'Vitamins', 'times': ['09:00'], 'on': true}));
+      store.setSetting('license', {'key': 'TEST-KEY-1234'});
       final errors = <String>[];
       final old = FlutterError.onError;
       FlutterError.onError = (d) => errors.add('${d.exceptionAsString()}\n${d.stack.toString().split('\n').take(8).join('\n')}');

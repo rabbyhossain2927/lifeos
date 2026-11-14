@@ -3,7 +3,7 @@ description: LifeOS - goals, habits, journal and daily life in one calm app.
 publish_to: 'none'
 
 # The CI build overrides this with the version you type (1.0.3) and the run number.
-version: 1.0.0+1
+version: 26.0.0+2600
 
 environment:
   sdk: '>=3.4.0 <4.0.0'

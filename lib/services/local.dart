@@ -21,6 +21,10 @@ class Local {
   static String photoFor(String day) => sp.getString('photo_$day') ?? '';
   static Future<void> setPhoto(String day, String path) => sp.setString('photo_$day', path);
 
+  static bool get haptics => sp.getBool('haptics') ?? true;
+  static Future<void> setHaptics(bool v) => sp.setBool('haptics', v);
+  static int get lastBackup => sp.getInt('last_backup') ?? 0;
+  static Future<void> setLastBackup(int v) => sp.setInt('last_backup', v);
   static int get lastUpdateCheck => sp.getInt('update_checked') ?? 0;
   static Future<void> setLastUpdateCheck(int v) => sp.setInt('update_checked', v);
 }

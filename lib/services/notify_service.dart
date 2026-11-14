@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
+import 'life.dart';
+import 'prayer.dart';
 import 'store.dart';
 
 /// Phone notifications: daily reminders, dates, haircut, update alerts.
@@ -36,6 +38,8 @@ class NotifyService {
       for (final c in const [
         AndroidNotificationChannel('reminders', 'Reminders', description: 'Water, meals, medicine, work and your own reminders', importance: Importance.high),
         AndroidNotificationChannel('dates', 'Important dates', description: 'Birthdays, renewals and haircut', importance: Importance.high),
+        AndroidNotificationChannel('prayer', 'Prayer times', description: '10 minutes before each prayer', importance: Importance.high),
+        AndroidNotificationChannel('nudges', 'Nudges', description: 'Habit nudge and weekly review', importance: Importance.defaultImportance),
         AndroidNotificationChannel('focus', 'Focus timer', description: 'When a focus session ends', importance: Importance.high),
         AndroidNotificationChannel('updates', 'App updates', description: 'When a new version of LifeOS is ready', importance: Importance.high),
       ]) {
@@ -116,7 +120,35 @@ class NotifyService {
         await _zoned(_id('date${d['id']}'), '${d['title']}', before == 0 ? 'Today' : 'In $before day${before == 1 ? '' : 's'}',
             tz.TZDateTime.from(when, tz.local), _d('dates', 'Important dates'));
       }
-      // 3. Haircut.
+      // 3. Prayer alerts: 10 minutes before each prayer, today and the next 2 days.
+      if (s.settings['prayerAlerts'] != false) {
+        final loc = s.settings['city'] is List ? (s.settings['city'] as List).map((e) => (e as num).toDouble()).toList() : const [23.8103, 90.4125];
+        for (var d = 0; d < 3; d++) {
+          final times = PrayerTimes.forDay(now.add(Duration(days: d)), loc[0], loc[1], shafi: s.shafi);
+          for (final e in times.entries) {
+            final at = e.value.subtract(const Duration(minutes: 10));
+            if (at.isBefore(now)) continue;
+            await _zoned(_id('prayer${e.key}$d'), '${e.key} in 10 minutes', 'At ${e.value.hour % 12 == 0 ? 12 : e.value.hour % 12}:${e.value.minute.toString().padLeft(2, '0')}',
+                tz.TZDateTime.from(at, tz.local), _d('prayer', 'Prayer times'));
+          }
+        }
+      }
+      // 4. Habit nudge at 9 PM when habits are not all done.
+      if (s.settings['habitNudge'] != false && s.list('habits').isNotEmpty) {
+        final left = s.list('habits').length - s.habitsDoneToday;
+        if (left > 0) {
+          final at = DateTime(now.year, now.month, now.day, 21);
+          if (at.isAfter(now)) {
+            await _zoned(_id('nudge'), '$left habit${left == 1 ? '' : 's'} left today', 'A small tick still counts. Open LifeOS.', tz.TZDateTime.from(at, tz.local), _d('nudges', 'Nudges'));
+          }
+        }
+      }
+      // 5. Weekly review, Friday 3 PM.
+      if (s.settings['weeklyReview'] != false) {
+        await _zoned(_id('review'), 'Week review', 'Three taps: how did your week go?', _nextAt(15, 0, weekday: DateTime.friday), _d('nudges', 'Nudges'),
+            repeat: DateTimeComponents.dayOfWeekAndTime);
+      }
+      // 6. Haircut.
       final hc = DateTime.tryParse('${s.settings['haircutNext'] ?? ''}');
       if (hc != null) {
         final when = DateTime(hc.year, hc.month, hc.day, 10);

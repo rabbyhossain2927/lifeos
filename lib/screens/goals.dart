@@ -1,80 +1,47 @@
 import 'package:flutter/material.dart';
 import '../services/store.dart';
-import '../widgets/form.dart';
+import '../widgets/kit.dart';
+import '../widgets/motion.dart';
 import '../widgets/ui.dart';
 import 'goal_detail.dart';
 import 'shell.dart';
 
-const areas = ['Health', 'Faith', 'Family', 'Learn', 'Work', 'Money', 'Self'];
+const areas = ['Health', 'Faith', 'Learn', 'Work', 'Family', 'Money', 'Self'];
 
+/// title, target, unit, area, step, logUnit, perUnit
 const goalTemplates = <String, Map<String, dynamic>>{
-  'Reading': {'title': 'Read 24 books', 'area': 'Learn', 'target': 24, 'unit': 'books', 'step': 'Read 15 pages'},
-  'Fitness': {'title': 'Work out 150 times', 'area': 'Health', 'target': 150, 'unit': 'workouts', 'step': '30 min workout'},
-  'Weight': {'title': 'Lose 8 kg', 'area': 'Health', 'target': 8, 'unit': 'kg', 'step': 'Walk 8,000 steps'},
-  'Quran khatam': {'title': 'Quran khatam', 'area': 'Faith', 'target': 30, 'unit': 'juz', 'step': 'Read 4 pages'},
-  'Saving': {'title': 'Save 1,00,000 taka', 'area': 'Money', 'target': 100000, 'unit': 'taka', 'step': 'Put aside today'},
+  'Read books': {'title': 'Read 24 books', 'target': 24, 'unit': 'books', 'area': 'Learn', 'step': 'Read 20 pages', 'logUnit': 'pages', 'perUnit': 300},
+  'Lose weight': {'title': 'Lose 8 kg', 'target': 8, 'unit': 'kg', 'area': 'Health', 'step': 'Walk 8,000 steps'},
+  'Quran khatam': {'title': 'Quran khatam', 'target': 30, 'unit': 'juz', 'area': 'Faith', 'step': 'Read 2 pages', 'logUnit': 'pages', 'perUnit': 20},
+  'Save money': {'title': 'Save 1,00,000 taka', 'target': 100000, 'unit': 'taka', 'area': 'Money', 'step': 'Put aside 300 taka'},
+  'Workouts': {'title': 'Work out 150 times', 'target': 150, 'unit': 'workouts', 'area': 'Health', 'step': '30 min workout'},
+  'My own': {'title': '', 'target': 10, 'unit': 'times', 'area': 'Self', 'step': 'One small step'},
 };
 
-List<Field> goalFields = const [
-  Field('title', 'Big goal for this year', hint: 'Read 24 books', required: true),
-  Field('area', 'Life area', type: F.choice, options: areas),
-  Field('type', 'How you track it', type: F.choice, options: ['Count', 'Yes / no']),
-  Field('target', 'Yearly target (number)', type: F.number, hint: '24'),
-  Field('unit', 'Unit', hint: 'books, kg, pages…'),
-  Field('step', "Today's small step", hint: 'Read 15 pages'),
-  Field('daily', 'Amount you log each day (optional)', type: F.number, hint: 'Leave empty to split the year evenly'),
-  Field('why', 'My why: the deeper reason', type: F.long, hint: 'Shown to you on hard days'),
-];
+const levels = {'Year': 'year', 'Month': 'month', 'Week': 'week', 'Today': 'day'};
 
-Map<String, dynamic> _clean(Map<String, dynamic> v) {
-  final yesno = v['type'] == 'Yes / no';
-  return {
-    ...v,
-    'type': yesno ? 'yesno' : 'count',
-    'target': yesno ? 365 : ((v['target'] as num?) ?? 1),
-    'daily': yesno ? 1 : v['daily'],
-  };
-}
+extension GoalMath on Store {
+  bool onTrack(Json g) {
+    final behind = goalBehind(g);
+    final year = goalProgress(g)['year']!;
+    return behind <= 0 || year >= 0.9 * (year + behind);
+  }
 
-/// Pick a template or start empty, then fill the form.
-Future<void> addGoal(BuildContext context) async {
-  final s = store(context, listen: false);
-  final pick = await showModalBottomSheet<String>(
-    context: context,
-    backgroundColor: C.white,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-    builder: (c) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-        child: Col([
-          Text('New goal', style: t(22, w: w6)),
-          Text('Start from a template or your own.', style: t(14, c: C.muted)),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            for (final k in goalTemplates.keys) SmallPill(k, onTap: () => Navigator.pop(c, k)),
-            SmallPill('My own goal', bg: C.ink, fg: C.white, onTap: () => Navigator.pop(c, '')),
-          ]),
-        ]),
-      ),
-    ),
-  );
-  if (pick == null || !context.mounted) return;
-  final init = pick.isEmpty ? <String, dynamic>{'type': 'Count'} : {...goalTemplates[pick]!, 'type': 'Count'};
-  final v = await showForm(context, 'New goal', goalFields, initial: init, save: 'Add goal');
-  if (v == null) return;
-  s.add('goals', {..._clean(v), 'logs': <String, dynamic>{}});
-}
-
-Future<void> editGoal(BuildContext context, Json g) async {
-  final s = store(context, listen: false);
-  final v = await showForm(context, 'Edit goal', goalFields,
-      initial: {...g, 'type': g['type'] == 'yesno' ? 'Yes / no' : 'Count'}, onDelete: () async {
-    if (await confirm(context, 'Delete this goal?')) {
-      s.remove('goals', g['id'] as String);
-      if (context.mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+  /// "9 / 24 books" for a level; week and day use the small unit (pages) when there is one.
+  String goalPair(Json g, String level) {
+    final p = goalProgress(g)[level]!, tg = goalTargets(g)[level]!;
+    final per = (g['perUnit'] ?? 0) as num;
+    if (per > 1 && (level == 'week' || level == 'day')) {
+      return '${(p * per).round()} / ${(tg * per).round()} ${g['logUnit'] ?? ''}';
     }
-  });
-  if (v == null) return;
-  s.patch('goals', g['id'] as String, _clean(v));
+    return '${fmtAmount(p)} / ${fmtAmount(tg)} ${g['unit'] ?? ''}';
+  }
+}
+
+String fmtAmount(num v) {
+  if (v.abs() >= 1000) return v.round().toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
+  if (v == v.roundToDouble()) return v.toInt().toString();
+  return v.abs() < 1 ? v.toStringAsFixed(2) : v.toStringAsFixed(1);
 }
 
 class GoalsTab extends StatefulWidget {
@@ -85,110 +52,352 @@ class GoalsTab extends StatefulWidget {
 
 class _GoalsTabState extends State<GoalsTab> {
   String level = 'Year';
-  static const levelKey = {'Year': 'year', 'Month': 'month', 'Week': 'week', 'Day': 'day'};
 
   @override
   Widget build(BuildContext context) {
     final s = store(context);
     final goals = s.todayGoals;
-    final usedAreas = goals.map((g) => g['area']).toSet().length;
-    final lk = levelKey[level]!;
+    final k = levels[level]!;
+    final onTrack = goals.where(s.onTrack).length;
+    final todayDone = goals.where(s.goalDoneToday).length;
+    final pct = goals.isEmpty
+        ? 0.0
+        : goals.fold<double>(0, (a, g) => a + (s.goalProgress(g)[k]! / s.goalTargets(g)[k]!).clamp(0.0, 1.0)) / goals.length;
+    final levelName = level == 'Today' ? 'Today' : 'This ${level.toLowerCase()}';
+
     return TabBody(children: [
-      TabHeader(small: '${DateTime.now().year} · $usedAreas life area${usedAreas == 1 ? '' : 's'}', title: 'Goals'),
-      Segmented(options: const ['Year', 'Month', 'Week', 'Day'], selected: level, onPick: (l) => setState(() => level = l)),
+      TabTitle('Goals', sub: '${DateTime.now().year} · ${goals.length} goals · $onTrack on track', trailing: HeadPill('Review', onTap: () => push(context, const ReviewPage()))),
+      // Year / Month / Week / Today
+      Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: C.white, borderRadius: BorderRadius.circular(999)),
+        child: LayoutBuilder(builder: (context, box) {
+          final w = (box.maxWidth - 12) / 4;
+          final i = levels.keys.toList().indexOf(level);
+          return SizedBox(
+            height: 42,
+            child: Stack(children: [
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutBack,
+                left: i * (w + 4),
+                top: 0,
+                bottom: 0,
+                width: w,
+                child: Container(decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(999))),
+              ),
+              Row(children: gap([
+                for (final l in levels.keys)
+                  Expanded(
+                    child: Press(
+                      onTap: () => setState(() => level = l),
+                      haptic: Haptic.select,
+                      label: l,
+                      selected: l == level,
+                      child: Center(
+                        child: AnimatedDefaultTextStyle(duration: const Duration(milliseconds: 200), style: t(13, w: w6, c: l == level ? C.white : C.muted), child: Text(l)),
+                      ),
+                    ),
+                  ),
+              ], 4)),
+            ]),
+          );
+        }),
+      ),
+      IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: gap([
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(26)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('$levelName progress', style: t(13, c: C.darkMuted)),
+                const SizedBox(height: 10),
+                Ring(value: pct, size: 96, stroke: 11, center: CountText(pct * 100, style: t(21, w: w6, c: C.white), format: (v) => '${v.round()}%')),
+                const SizedBox(height: 10),
+                Text('All goals together', style: t(12, c: C.lime)),
+              ]),
+            ),
+          ),
+          Expanded(
+            child: Column(children: [
+              Expanded(child: _stat('On track', '$onTrack of ${goals.length}', C.lime)),
+              const SizedBox(height: 10),
+              Expanded(child: _stat("Today's steps", '$todayDone of ${goals.length}', C.white)),
+            ]),
+          ),
+        ], 10)),
+      ),
+      Padding(padding: const EdgeInsets.only(left: 4, top: 4), child: Text('My goals', style: t(18, w: w6))),
       if (goals.isEmpty)
-        Box(
-          onTap: () => addGoal(context),
-          child: Col([
-            const H2('Set your first big goal'),
-            Text('Pick 3 to 5 big goals for the year. LifeOS splits each into month, week and today, and every tick moves all the bars.',
-                style: t(14, c: C.muted, h: 1.45)),
-            PillButton('Add a goal', bg: C.ink, fg: C.white, onTap: () => addGoal(context)),
-          ]),
+        Panel(child: Text('No goals yet. Tap "+ New goal" and pick a template. LifeOS splits it into months, weeks and a small step for today.', style: t(14, c: C.muted, h: 1.45))),
+      for (final g in goals) GoalCard(g: g, level: k, levelName: levelName),
+      Press(
+        onTap: () => addGoalPage(context),
+        label: 'New goal',
+        child: Container(
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), border: Border.all(color: C.border, width: 1.5)),
+          child: Text('+ New goal', style: t(15, w: w6)),
         ),
-      if (goals.isNotEmpty) _featured(context, s, goals.first),
-      if (goals.length > 1) const H2('Other goals'),
-      for (final g in goals.skip(1)) _small(context, s, g, lk),
-      _dashed('+ New goal', () => addGoal(context)),
+      ),
     ]);
   }
 
-  Widget _featured(BuildContext context, Store s, Json g) {
-    final p = s.goalProgress(g), tg = s.goalTargets(g);
-    final unit = (g['unit'] ?? '').toString();
-    return Box(
-      onTap: () => push(context, GoalDetailScreen(id: g['id'] as String)),
-      child: Col([
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: Col([
-              _tag('${g['area'] ?? 'Self'}'),
-              Text('${g['title']}', style: t(20, w: w6, ls: -0.2)),
-            ], space: 6),
-          ),
-          Text('Yearly', style: t(13, c: C.muted)),
+  Widget _stat(String k, String v, Color bg) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(22)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text(k, style: t(12, w: bg == C.lime ? w6 : FontWeight.w400, c: bg == C.lime ? C.ink : C.muted)),
+          const SizedBox(height: 4),
+          AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: Text(v, key: ValueKey(v), style: t(22, w: w6))),
         ]),
-        Container(
-          padding: const EdgeInsets.only(left: 16),
-          margin: const EdgeInsets.only(left: 5),
-          decoration: const BoxDecoration(border: Border(left: BorderSide(color: C.line, width: 2))),
-          child: Col([
-            for (final l in const ['year', 'month', 'week', 'day'])
-              _level(_levelName(l), '${numText(p[l]!)} / ${numText(tg[l]!)} $unit', p[l]! / tg[l]!, l == 'day'),
-          ], space: 14),
-        ),
-      ], space: 16),
-    );
-  }
-
-  String _levelName(String l) {
-    final now = DateTime.now();
-    return switch (l) { 'year' => '${now.year}', 'month' => monthsLong[now.month - 1], 'week' => 'This week', _ => 'Today' };
-  }
-
-  Widget _level(String name, String value, double v, bool today) => Col([
-        Row(children: [Expanded(child: Text(name, style: t(13, w: w5))), Text(value, style: t(13, c: C.muted))]),
-        Bar(v, height: 6, color: today ? C.lime2 : C.ink),
-      ], space: 6);
-
-  Widget _small(BuildContext context, Store s, Json g, String lk) {
-    final p = s.goalProgress(g), tg = s.goalTargets(g);
-    final unit = (g['unit'] ?? '').toString();
-    return Box(
-      radius: 24,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      onTap: () => push(context, GoalDetailScreen(id: g['id'] as String)),
-      child: Col([
-        Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${g['title']}', style: t(15, w: w5)),
-              const SizedBox(height: 2),
-              Text('${g['area'] ?? 'Self'} · this week ${numText(p['week']!)} of ${numText(tg['week']!)}', style: t(12, c: C.muted)),
-            ]),
-          ),
-          Text('${numText(p[lk]!)} / ${numText(tg[lk]!)}${unit.isEmpty ? '' : ' $unit'}', style: t(14, w: w6)),
-        ]),
-        Bar(p[lk]! / tg[lk]!, height: 4),
-      ], space: 10),
-    );
-  }
-
-  Widget _tag(String s) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: C.chip, borderRadius: BorderRadius.circular(999)),
-        child: Text(s, style: t(11, w: w6)),
       );
 }
 
-Widget _dashed(String text, VoidCallback onTap) => GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 48,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(999), border: Border.all(color: C.border, width: 1.5)),
-        child: Text(text, style: t(14, w: w5)),
+class GoalCard extends StatelessWidget {
+  final Json g;
+  final String level, levelName;
+  const GoalCard({super.key, required this.g, required this.level, required this.levelName});
+  @override
+  Widget build(BuildContext context) {
+    final s = store(context);
+    final done = s.goalDoneToday(g);
+    final on = s.onTrack(g);
+    final p = s.goalProgress(g)[level]! / s.goalTargets(g)[level]!;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: C.white, borderRadius: BorderRadius.circular(26)),
+      child: Col([
+        Press(
+          onTap: () => push(context, GoalDetail(id: g['id'] as String)),
+          scale: 0.98,
+          label: '${g['title']}',
+          child: Col([
+            Row(children: [Tag.area('${g['area'] ?? 'Self'}'), const Spacer(), on ? const Tag('On track', bg: C.ink, fg: C.lime) : const Tag('Behind', bg: C.warnSoft, fg: C.warn)]),
+            Text('${g['title']}', style: t(18, w: w6, ls: -0.2)),
+            Row(children: [Expanded(child: Text(levelName, style: t(13, c: C.muted))), Text(s.goalPair(g, level), style: t(13, w: w6))]),
+            Bar(p, color: level == 'day' ? C.lime2 : C.ink),
+          ], space: 10),
+        ),
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+          decoration: BoxDecoration(color: C.chip, borderRadius: BorderRadius.circular(18)),
+          child: Row(children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text("Today's step", style: t(11, c: C.muted)),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 200),
+                  style: t(15, w: w6, c: done ? const Color(0xFF8A8A84) : C.ink, deco: done ? TextDecoration.lineThrough : null),
+                  child: Text('${g['step'] ?? 'One small step'}'),
+                ),
+              ]),
+            ),
+            TickCircle(
+              done: done,
+              size: 44,
+              label: "today's step",
+              onTap: () {
+                s.toggleGoalToday(g);
+                if (!done) say(context, 'Nice. Year, month, week and today all moved.');
+              },
+            ),
+          ]),
+        ),
+      ], space: 12),
+    );
+  }
+}
+
+/// New goal: one page, all taps.
+Future<void> addGoalPage(BuildContext context) => push(context, const AddGoalPage());
+
+class AddGoalPage extends StatefulWidget {
+  const AddGoalPage({super.key});
+  @override
+  State<AddGoalPage> createState() => _AddGoalPageState();
+}
+
+class _AddGoalPageState extends State<AddGoalPage> {
+  String tpl = 'Read books';
+  late Map<String, dynamic> d = Map.of(goalTemplates[tpl]!);
+  late final name = TextEditingController(text: d['title'] as String);
+  String why = '';
+
+  num get target => d['target'] as num;
+  num get stepSize => target >= 10000 ? 5000 : target >= 1000 ? 100 : target >= 100 ? 10 : 1;
+
+  void pick(String k) {
+    setState(() {
+      tpl = k;
+      d = Map.of(goalTemplates[k]!);
+      name.text = d['title'] as String;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final unit = '${d['unit']}';
+    String r(num v) => fmtAmount(v < 1 ? (v * 100).round() / 100 : (v * 10).round() / 10);
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(gradient: bgGradient),
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 40),
+            children: gap(stagger([
+              Row(children: [const BackBtn(icon: Icons.close_rounded, label: 'Close'), const SizedBox(width: 12), Text('New goal', style: t(17, w: w6))]),
+              Text('1. Start from', style: t(14, w: w6)),
+              Chips(options: goalTemplates.keys.toList(), selected: {tpl}, onTap: pick, off: C.white),
+              Text('2. Goal name', style: t(14, w: w6)),
+              TextField(
+                controller: name,
+                style: t(16, w: w5),
+                decoration: InputDecoration(
+                  hintText: 'Read 24 books',
+                  filled: true,
+                  fillColor: C.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide.none),
+                ),
+              ),
+              Text('3. How many this year?', style: t(14, w: w6)),
+              Stepper2(
+                value: fmtAmount(target),
+                unit: unit,
+                size: 28,
+                bg: C.white,
+                onMinus: () => setState(() => d['target'] = target - stepSize < 1 ? 1 : target - stepSize),
+                onPlus: () => setState(() => d['target'] = target + stepSize),
+              ),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: C.limeSoft, borderRadius: BorderRadius.circular(18)),
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(text: 'LifeOS splits it for you: ', style: t(13, c: C.limeText, h: 1.45)),
+                  TextSpan(text: '${r(target / 12)} $unit a month · ${r(target / 52)} a week · a small step every day', style: t(13, w: w6, c: C.limeText, h: 1.45)),
+                ])),
+              ),
+              Text('4. Life area', style: t(14, w: w6)),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final a in areas)
+                  Press(
+                    onTap: () => setState(() => d['area'] = a),
+                    haptic: Haptic.select,
+                    label: a,
+                    selected: d['area'] == a,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      height: 40,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: areaColors[a]!.$1,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: d['area'] == a ? areaColors[a]!.$2 : areaColors[a]!.$1, width: 1.5),
+                      ),
+                      child: Text(a, style: t(13, w: w6, c: areaColors[a]!.$2)),
+                    ),
+                  ),
+              ]),
+              Text.rich(TextSpan(children: [TextSpan(text: '5. Why it matters ', style: t(14, w: w6)), TextSpan(text: '(optional)', style: t(14, c: C.muted))])),
+              Chips(options: const ['For my family', 'For my health', 'To grow', 'For Allah'], selected: {why}, off: C.white, onTap: (w) => setState(() => why = why == w ? '' : w)),
+              const SizedBox(height: 4),
+              PressPill('Create goal', success: true, onTap: () {
+                final title = name.text.trim();
+                if (title.isEmpty) {
+                  say(context, 'Give the goal a name first.', good: false);
+                  return;
+                }
+                store(context, listen: false).add('goals', {
+                  ...d,
+                  'title': title,
+                  'type': 'count',
+                  'why': why,
+                  'logs': <String, dynamic>{},
+                  'steps': <dynamic>[],
+                });
+                Haptic.celebrate();
+                Navigator.pop(context);
+                toast(context, "Goal created. Today's step is on the Goals tab.");
+              }),
+            ]), 12),
+          ),
+        ),
       ),
     );
+  }
+}
 
-Widget dashedButton(String text, VoidCallback onTap) => _dashed(text, onTap);
+/// Week review: summary + three chip questions.
+class ReviewPage extends StatefulWidget {
+  const ReviewPage({super.key});
+  @override
+  State<ReviewPage> createState() => _ReviewPageState();
+}
+
+class _ReviewPageState extends State<ReviewPage> {
+  final a = <String, String>{};
+
+  @override
+  Widget build(BuildContext context) {
+    final s = store(context);
+    final goals = s.todayGoals;
+    final ws = weekStart;
+    final q = [
+      ('How did this week go?', 'feel', ['Great', 'Okay', 'Hard']),
+      ('What helped most?', 'help', ['Morning time', 'Reminders', 'Small steps', 'Family']),
+      ('Focus next week', 'next', [for (final g in goals) '${g['title']}']),
+    ];
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(gradient: bgGradient),
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 40),
+            children: gap(stagger([
+              Row(children: [
+                const BackBtn(),
+                const SizedBox(width: 12),
+                Expanded(child: Text('Week review', style: t(17, w: w6))),
+                Text('${shortDate(ws)} – ${shortDate(ws.add(const Duration(days: 6)))}', style: t(13, c: C.muted)),
+              ]),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(24)),
+                child: Col([
+                  Text('This week', style: t(13, c: C.darkMuted)),
+                  if (goals.isEmpty) Text('Add a goal to see your week here.', style: t(14, c: C.white)),
+                  for (final g in goals)
+                    Builder(builder: (_) {
+                      final p = (s.goalProgress(g)['week']! / s.goalTargets(g)['week']!).clamp(0.0, 1.0);
+                      return Col([
+                        Row(children: [Expanded(child: Text('${g['title']}', style: t(13, c: C.white))), Text('${(p * 100).round()}%', style: t(13, w: w6, c: C.lime))]),
+                        Bar(p, height: 6, color: C.lime, track: C.dark3),
+                      ], space: 6);
+                    }),
+                ], space: 10),
+              ),
+              for (final x in q)
+                if (x.$3.isNotEmpty)
+                  Panel(
+                    title: x.$1,
+                    child: Chips(options: x.$3, selected: {a[x.$2] ?? ''}, onTap: (o) => setState(() => a[x.$2] = o)),
+                  ),
+              PressPill('Save review', success: true, onTap: () {
+                s.patchDay({'review': a});
+                Navigator.pop(context);
+                toast(context, a['next'] == null ? 'Review saved.' : "Review saved. Next week's focus: ${a['next']}.");
+              }),
+            ]), 14),
+          ),
+        ),
+      ),
+    );
+  }
+}

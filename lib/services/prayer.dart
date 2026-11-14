@@ -51,7 +51,7 @@ class PrayerTimes {
   }
 
   /// Times for a day as DateTime in the phone's time zone.
-  static Map<String, DateTime> forDay(DateTime date, double lat, double lng) {
+  static Map<String, DateTime> forDay(DateTime date, double lat, double lng, {bool shafi = false}) {
     final tz = date.timeZoneOffset.inMinutes / 60.0;
     final jd = _julian(date.year, date.month, date.day) - lng / (15 * 24);
 
@@ -67,7 +67,7 @@ class PrayerTimes {
 
     double asr(double t) {
       final decl = _sun(jd + t)[0];
-      final angle = -_r2d(math.atan(1 / (2 + math.tan(_d2r((lat - decl).abs())))));
+      final angle = -_r2d(math.atan(1 / ((shafi ? 1 : 2) + math.tan(_d2r((lat - decl).abs())))));
       return angleTime(angle, t);
     }
 
@@ -87,13 +87,13 @@ class PrayerTimes {
   }
 
   /// The next prayer from now: name and time (tomorrow's Fajr after Isha).
-  static MapEntry<String, DateTime> next(double lat, double lng) {
+  static MapEntry<String, DateTime> next(double lat, double lng, {bool shafi = false}) {
     final now = DateTime.now();
-    final t = forDay(now, lat, lng);
+    final t = forDay(now, lat, lng, shafi: shafi);
     for (final n in names) {
       if (t[n]!.isAfter(now)) return MapEntry(n, t[n]!);
     }
-    final tm = forDay(now.add(const Duration(days: 1)), lat, lng);
+    final tm = forDay(now.add(const Duration(days: 1)), lat, lng, shafi: shafi);
     return MapEntry('Fajr', tm['Fajr']!);
   }
 }

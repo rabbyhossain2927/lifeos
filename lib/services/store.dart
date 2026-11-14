@@ -10,7 +10,7 @@ typedef Json = Map<String, dynamic>;
 
 /// PHP turns an empty JSON object {} into [] on its way back from the server.
 /// These fields are always maps, so an empty list there means an empty map.
-const _mapFields = {'logs', 'duas', 'reset', 'license'};
+const _mapFields = {'logs', 'duas', 'reset', 'license', 'plan', 'review'};
 
 Json cleanDoc(Object? raw) {
   if (raw is! Map) return <String, dynamic>{};
@@ -343,10 +343,10 @@ class Store extends ChangeNotifier {
     };
   }
 
-  /// Share of the yearly target for each level. Daily is at least 1.
+  /// Share of the yearly target for each level (small goals get fractions, like 0.07 books a day).
   Map<String, num> goalTargets(Json g) {
     final t = goalTarget(g);
-    num r(num v) => v < 1 ? 1 : (v * 10).round() / 10;
+    num r(num v) => v < 1 ? ((v * 100).round() / 100).clamp(0.01, 1) : (v * 10).round() / 10;
     return {'year': t, 'month': r(t / 12), 'week': r(t / 52), 'day': g['daily'] is num ? g['daily'] as num : r(t / 365)};
   }
 

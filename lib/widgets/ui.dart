@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/store.dart';
+import 'motion.dart';
 
 /// Colours from the design.
 class C {
@@ -237,9 +238,13 @@ class Toggle extends StatelessWidget {
       toggled: on,
       label: label,
       child: GestureDetector(
-        onTap: () => onChanged(!on),
+        onTap: () {
+          Haptic.select();
+          onChanged(!on);
+        },
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutBack,
           width: 52,
           height: 32,
           padding: const EdgeInsets.all(3),
@@ -268,22 +273,32 @@ class Tick extends StatelessWidget {
       checked: done,
       label: label,
       child: InkResponse(
-        onTap: onTap,
+        onTap: () {
+          done ? Haptic.tap() : Haptic.success();
+          onTap();
+        },
         radius: 26,
         child: SizedBox(
           width: 44,
           height: 44,
           child: Center(
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutBack,
               width: size,
               height: size,
               decoration: BoxDecoration(
-                color: done ? C.lime2 : Colors.transparent,
+                color: done ? C.lime : Colors.transparent,
                 shape: square ? BoxShape.rectangle : BoxShape.circle,
                 borderRadius: square ? BorderRadius.circular(7) : null,
                 border: done ? null : Border.all(color: darkBg ? const Color(0xFF6E6E68) : C.border, width: 1.5),
               ),
-              child: done ? Icon(Icons.check_rounded, size: size * 0.62, color: C.ink) : null,
+              child: AnimatedScale(
+                scale: done ? 1 : 0,
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutBack,
+                child: Icon(Icons.check_rounded, size: size * 0.62, color: C.ink),
+              ),
             ),
           ),
         ),
@@ -309,9 +324,14 @@ class Bar extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(color: track, borderRadius: BorderRadius.circular(height)),
       alignment: Alignment.centerLeft,
-      child: FractionallySizedBox(
-        widthFactor: v,
-        child: Container(decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(height))),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: v),
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.easeOutCubic,
+        builder: (_, x, __) => FractionallySizedBox(
+          widthFactor: x,
+          child: Container(decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(height))),
+        ),
       ),
     );
   }
@@ -329,8 +349,11 @@ class Ring extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(
-        painter: _RingPainter(value.isNaN ? 0 : value.clamp(0.0, 1.0), stroke, color, track),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: value.isNaN ? 0 : value.clamp(0.0, 1.0)),
+        duration: const Duration(milliseconds: 900),
+        curve: Curves.easeOutCubic,
+        builder: (_, v, child) => CustomPaint(painter: _RingPainter(v, stroke, color, track), child: child),
         child: Center(child: center),
       ),
     );
@@ -467,9 +490,12 @@ class ChoiceRow extends StatelessWidget {
               selected: o == selected,
               button: true,
               child: GestureDetector(
-                onTap: () => onPick(o),
+                onTap: () {
+                  Haptic.select();
+                  onPick(o);
+                },
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
+                  duration: const Duration(milliseconds: 180),
                   height: height,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
@@ -502,8 +528,13 @@ class Segmented extends StatelessWidget {
         for (final o in options)
           Expanded(
             child: GestureDetector(
-              onTap: () => onPick(o),
-              child: Container(
+              onTap: () {
+                Haptic.select();
+                onPick(o);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
                 height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
@@ -538,7 +569,9 @@ class Bars extends StatelessWidget {
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: gap([
           for (final v in values)
             Expanded(
-              child: Container(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
                 height: v < 0 ? 4 : math.max(4, height * v.clamp(0.0, 1.0)),
                 decoration: BoxDecoration(color: v < 0 ? empty : color, borderRadius: BorderRadius.circular(radius)),
               ),
@@ -603,4 +636,4 @@ Future<bool> confirm(BuildContext context, String title, {String ok = 'Delete', 
   return r == true;
 }
 
-Future<T?> push<T>(BuildContext context, Widget page) => Navigator.of(context).push<T>(MaterialPageRoute(builder: (_) => page));
+Future<T?> push<T>(BuildContext context, Widget page) => Navigator.of(context).push<T>(SlideRoute<T>(page));
