@@ -45,6 +45,7 @@ void main() {
       store.add('care', cleanDoc({'name': 'Face wash', 'time': 'pm', 'logs': []}));
       store.add('reminders', cleanDoc({'title': 'Vitamins', 'times': ['09:00'], 'on': true}));
       store.setSetting('license', {'key': 'TEST-KEY-1234'});
+      store.setSetting('name', 'Test');
       final errors = <String>[];
       final old = FlutterError.onError;
       FlutterError.onError = (d) => errors.add('${d.exceptionAsString()}\n${d.stack.toString().split('\n').take(8).join('\n')}');

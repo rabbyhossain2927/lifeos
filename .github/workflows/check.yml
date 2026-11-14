@@ -36,3 +36,13 @@ jobs:
             grep -E "^=== |Exception|Error|was thrown|\.dart:[0-9]+" test.txt | grep -v "^\s*$" | head -60 | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
+      - name: Screenshots of every screen
+        if: always()
+        continue-on-error: true
+        run: flutter test shots/shots_test.dart --update-goldens
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: shots/out/*.png
+          if-no-files-found: ignore
