@@ -88,7 +88,7 @@ class _AccountTabState extends State<AccountTab> {
         decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(28)),
         child: Col([
           Row(children: [
-            const Avatar(size: 60),
+            const Avatar(size: 60, onDark: true),
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

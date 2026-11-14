@@ -227,7 +227,7 @@ class _SelfCarePageState extends State<SelfCarePage> {
       }
     }
     return ToolFrame('selfcare', children: [
-      HeroCard(label: '$r routine', big: '$n of ${steps.length}', sub: streak > 0 ? '$streak ${r == 'Night' ? 'nights' : 'mornings'} in a row' : 'Small and steady', ring: steps.isEmpty ? 0 : n / steps.length),
+      HeroCard(label: '$r routine', big: steps.isEmpty ? 'No steps yet' : '$n of ${steps.length}', sub: streak > 0 ? '$streak ${r == 'Night' ? 'nights' : 'mornings'} in a row' : 'Small and steady', ring: steps.isEmpty ? 0 : n / steps.length),
       Panel(title: 'Routine', child: Chips(options: const ['Morning', 'Night'], selected: {r}, onTap: (v) => setState(() => r = v))),
       RowsPanel(title: 'Steps', hint: 'hold to delete', empty: 'Add a step below.', rows: [
         for (final c in steps)

@@ -191,7 +191,7 @@ class LearnPage extends StatelessWidget {
       HeroCard(
         label: 'This week',
         big: '${week.reduce((a, b) => a + b).round()} lessons',
-        sub: '${courses.length} courses · ${books.length} books going',
+        sub: '${courses.length} course${courses.length == 1 ? '' : 's'} · ${books.length} book${books.length == 1 ? '' : 's'} going',
         bars: [for (var i = 0; i < 7; i++) (week[i], s.last7Letters[i])],
       ),
       RowsPanel(title: 'My learning', hint: 'tick = 1 done', empty: 'Nothing yet. Start something below.', rows: [
@@ -366,7 +366,7 @@ class RewardsPage extends StatelessWidget {
               }),
             ], space: 12));
       }),
-      const NoteCard('How to earn', '+5 each habit · +10 each goal step · +5 journal entry · +2 each win'),
+      const NoteCard('How to earn', '+10 each prayer · +10 each goal step · +5 each habit · +5 journal entry'),
     ]);
   }
 }

@@ -23,12 +23,14 @@ String userName(Store s) => '${s.settings['name'] ?? AuthService.user?.displayNa
 /// Avatar circle: first letter on the chosen colour.
 class Avatar extends StatelessWidget {
   final double size;
-  const Avatar({super.key, this.size = 48});
+  final bool onDark;
+  const Avatar({super.key, this.size = 48, this.onDark = false});
   @override
   Widget build(BuildContext context) {
     final s = store(context);
     final n = userName(s);
-    final c = Color(((s.settings['avatarColor'] ?? 0xFF111111) as num).toInt());
+    var c = Color(((s.settings['avatarColor'] ?? 0xFF111111) as num).toInt());
+    if (onDark && c.computeLuminance() < 0.05) c = C.lime; // black on the black card would vanish
     final dark = c.computeLuminance() < 0.3;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -384,12 +386,14 @@ class HomeTab extends StatelessWidget {
                 child: Container(
                   height: 40,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
-                  alignment: Alignment.center,
                   decoration: BoxDecoration(color: C.chip, borderRadius: BorderRadius.circular(999)),
-                  child: Text.rich(TextSpan(children: [
+                  child: Center(
+                    widthFactor: 1,
+                    child: Text.rich(TextSpan(children: [
                     TextSpan(text: '+ ${f.$1} ', style: t(13, w: w5)),
                     TextSpan(text: '${f.$2}', style: t(13, c: C.muted)),
                   ])),
+                  ),
                 ),
               ),
           ]),

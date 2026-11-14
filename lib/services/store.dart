@@ -84,6 +84,7 @@ class Store extends ChangeNotifier {
     } catch (e) {
       debugPrint('Local data could not be read: $e');
     }
+    if (_disposed) return;
     loaded = true;
     notifyListeners();
     unawaited(syncQuietly());
@@ -440,6 +441,7 @@ class Store extends ChangeNotifier {
     for (final d in list('days')) {
       if ((d['text'] ?? '').toString().trim().isNotEmpty) p += 5;
       p += ((d['wins'] as List?) ?? const []).length * 2;
+      p += ((d['prayed'] as List?) ?? const []).length * 10;
     }
     for (final r in list('redeems')) {
       p -= ((r['cost'] ?? 0) as num).toInt();
@@ -458,6 +460,7 @@ class Store extends ChangeNotifier {
     final d = day();
     if ((d['text'] ?? '').toString().trim().isNotEmpty) p += 5;
     p += ((d['wins'] as List?) ?? const []).length * 2;
+    p += ((d['prayed'] as List?) ?? const []).length * 10;
     return p;
   }
 
