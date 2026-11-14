@@ -58,7 +58,7 @@ Store seeded() {
 
 void main() {
   setUpAll(() async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({}); // ignore: invalid_use_of_visible_for_testing_member
     await Local.init();
     await _font('Geist', [for (final w in ['Regular', 'Medium', 'SemiBold', 'Light']) 'assets/fonts/Geist-$w.ttf']);
     final root = Platform.environment['FLUTTER_ROOT'] ?? '';

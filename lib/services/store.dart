@@ -90,8 +90,17 @@ class Store extends ChangeNotifier {
     _periodic = Timer.periodic(const Duration(seconds: 60), (_) => syncQuietly());
   }
 
+  bool _disposed = false;
+
+  /// Loading or syncing can finish after sign-out; then there is nobody to tell.
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _disposed = true;
     _saveTimer?.cancel();
     _syncTimer?.cancel();
     _periodic?.cancel();
