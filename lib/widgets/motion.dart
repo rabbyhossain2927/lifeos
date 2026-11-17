@@ -70,13 +70,13 @@ class _AppearState extends State<Appear> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
+  // FadeTransition + SlideTransition: no rebuild per frame and no saveLayer (Opacity widget did both).
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-        animation: a,
-        child: widget.child,
-        builder: (_, child) => Opacity(
-          opacity: a.value,
-          child: Transform.translate(offset: Offset(0, widget.dy * (1 - a.value)), child: child),
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: a,
+        child: SlideTransition(
+          position: Tween(begin: Offset(0, widget.dy / 400), end: Offset.zero).animate(a),
+          child: widget.child,
         ),
       );
 }

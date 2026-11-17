@@ -1,16 +1,4 @@
-## New
-- Goals: 12 starts with icons, Custom with your own icon, any period (daily to yearly or every N days), any unit (tk, $, steps, pages or your own), name suggestions and a suggested split
-- Goals: dated small steps (every day, weekly or monthly plan), custom log on any day, editable log history, edit the whole goal, big name and why
-- XP dashboard: tap the XP card on Home or Account
-- Dhikr: big round counter, your own dhikr and duas with targets
-- Habits: week boxes on Home and Habits, colours, menu on every habit, swipe to delete
-- Water in ml with real glass icons and custom amounts; food icons that match the food; daily calorie goal
-- Sleep: pick your hours and see what they mean; sleep overview on Home
-- Your own moods and reasons, mood history; type any number; delete workouts and days
-- Custom reminders (once, daily, weekdays, weekly, monthly); self care with time, repeat and reminder
-- Journal day type and editable entries; daily focus log and totals; learn books, courses, videos and more
-- Travel: trip list, trips and visits this year, photos; memories with photos, title, words, date and time
-- Profile photo with round crop; backup to Google Drive, phone and server, restore any of the last 5
-- Themes: 8 colours, paper texture, light, dark and auto; text size; week start; 24 hour time
-- What's new shows the last 5 updates; new How to use and About pages; feedback to hello@rabbyhossain.com
-- Smaller, softer text and calm motion everywhere (Reduce motion in Preferences)
+## Better
+- Smoother app: lighter animations, only the open tab redraws, one redraw per tap
+- Much smaller download: built for modern 64-bit phones only, code shrunk
+- Removed unused microphone permission

@@ -139,8 +139,17 @@ class Store extends ChangeNotifier {
     }
   }
 
+  bool _notifyQueued = false;
+
   void _changed() {
-    notifyListeners();
+    // Many patches in one tap -> one rebuild.
+    if (!_notifyQueued) {
+      _notifyQueued = true;
+      scheduleMicrotask(() {
+        _notifyQueued = false;
+        notifyListeners();
+      });
+    }
     _persist();
     _syncTimer?.cancel();
     _syncTimer = Timer(const Duration(seconds: 2), syncQuietly);

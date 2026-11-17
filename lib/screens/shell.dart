@@ -95,12 +95,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).padding.bottom;
-    final pages = [
-      HomeTab(onTab: go),
-      const GoalsTab(),
-      const ExploreTab(),
-      const AccountTab(),
-    ];
+    // Only the open tab is built: hidden tabs no longer rebuild on every store change.
+    final Widget page = switch (tab) {
+      0 => HomeTab(onTab: go),
+      1 => const GoalsTab(),
+      2 => const ExploreTab(),
+      _ => const AccountTab(),
+    };
     final fade = CurvedAnimation(parent: _fade, curve: Curves.easeOutCubic);
     return Scaffold(
       body: Container(
@@ -113,7 +114,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
                 opacity: fade,
                 child: SlideTransition(
                   position: Tween(begin: const Offset(0, 0.02), end: Offset.zero).animate(fade),
-                  child: IndexedStack(index: tab, children: pages),
+                  child: RepaintBoundary(child: KeyedSubtree(key: ValueKey(tab), child: page)),
                 ),
               ),
             ),

@@ -8,7 +8,6 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Voice notes to journal -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Lets LifeOS install its own updates (Android asks the user first) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
@@ -51,9 +50,6 @@
     </application>
 
     <queries>
-        <intent>
-            <action android:name="android.speech.RecognitionService" />
-        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />
             <data android:mimeType="text/plain" />
