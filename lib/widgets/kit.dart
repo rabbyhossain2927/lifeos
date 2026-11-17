@@ -148,8 +148,8 @@ class Panel extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Expanded(child: Text(title!, style: t(15, w: w6))),
-              if (hint != null) Text(hint!, style: t(12, c: C.muted)),
+              Expanded(flex: 3, child: Text(title!, style: t(14.5, w: w6))),
+              if (hint != null) ...[const SizedBox(width: 8), Flexible(flex: 2, child: Text(hint!, style: t(11.5, c: C.muted), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end))],
             ]),
           ),
         child,
