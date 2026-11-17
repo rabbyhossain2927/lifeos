@@ -407,6 +407,7 @@ class _AddGoalPageState extends State<AddGoalPage> {
       tpl = k;
       final keepPlan = d['plan'];
       d = {...goalTemplates[k]!, 'plan': keepPlan};
+      if (k == 'Save money') d['unit'] = '${store(context, listen: false).settings['currency'] ?? 'tk'}';
       if (!edit) name.text = _suggestName(k, d);
     });
   }

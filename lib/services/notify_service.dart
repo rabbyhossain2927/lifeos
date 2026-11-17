@@ -98,11 +98,23 @@ class NotifyService {
           final p = '$t'.split(':');
           if (p.length != 2) continue;
           final h = int.tryParse(p[0]) ?? 9, m = int.tryParse(p[1]) ?? 0;
-          if (weekdays) {
+          final repeat = '${r['repeat'] ?? (weekdays ? 'Weekdays' : 'Every day')}';
+          final base = DateTime.tryParse('${r['date'] ?? ''}') ?? DateTime.now();
+          if (repeat == 'Weekdays') {
             for (var wd = 1; wd <= 5; wd++) {
               await _zoned(_id('${r['id']}$t$wd'), title, body, _nextAt(h, m, weekday: wd), _d('reminders', 'Reminders'),
                   repeat: DateTimeComponents.dayOfWeekAndTime);
             }
+          } else if (repeat == 'Every week') {
+            await _zoned(_id('${r['id']}$t'), title, body, _nextAt(h, m, weekday: base.weekday), _d('reminders', 'Reminders'), repeat: DateTimeComponents.dayOfWeekAndTime);
+          } else if (repeat == 'Every month') {
+            var at = DateTime(DateTime.now().year, DateTime.now().month, base.day, h, m);
+            if (at.isBefore(DateTime.now())) at = DateTime(at.year, at.month + 1, base.day, h, m);
+            await _zoned(_id('${r['id']}$t'), title, body, tz.TZDateTime.from(at, tz.local), _d('reminders', 'Reminders'), repeat: DateTimeComponents.dayOfMonthAndTime);
+          } else if (repeat == 'Once') {
+            var at = DateTime(base.year, base.month, base.day, h, m);
+            if (at.isBefore(DateTime.now()) && dayKey(base) == dayKey(DateTime.now())) at = at.add(const Duration(days: 1));
+            if (at.isAfter(DateTime.now())) await _zoned(_id('${r['id']}$t'), title, body, tz.TZDateTime.from(at, tz.local), _d('reminders', 'Reminders'));
           } else {
             await _zoned(_id('${r['id']}$t'), title, body, _nextAt(h, m), _d('reminders', 'Reminders'), repeat: DateTimeComponents.time);
           }
@@ -148,7 +160,37 @@ class NotifyService {
         await _zoned(_id('review'), 'Week review', 'Three taps: how did your week go?', _nextAt(15, 0, weekday: DateTime.friday), _d('nudges', 'Nudges'),
             repeat: DateTimeComponents.dayOfWeekAndTime);
       }
-      // 6. Haircut.
+      // 6. Self care with a reminder.
+      for (final c in s.list('care')) {
+        if (c['remind'] != true) continue;
+        final p = '${c['time'] ?? ''}'.split(':');
+        if (p.length != 2) continue;
+        final h = int.tryParse(p[0]) ?? 21, m = int.tryParse(p[1]) ?? 0;
+        final title = '${c['name']}', body = 'Self care time';
+        switch ('${c['repeat'] ?? 'Every day'}') {
+          case 'Weekdays':
+            for (var wd = 1; wd <= 5; wd++) {
+              await _zoned(_id('care${c['id']}$wd'), title, body, _nextAt(h, m, weekday: wd), _d('reminders', 'Reminders'), repeat: DateTimeComponents.dayOfWeekAndTime);
+            }
+          case 'Weekly':
+            await _zoned(_id('care${c['id']}'), title, body, _nextAt(h, m, weekday: ((c['weekday'] ?? 1) as num).toInt()), _d('reminders', 'Reminders'), repeat: DateTimeComponents.dayOfWeekAndTime);
+          case 'Date':
+            final d = DateTime.tryParse('${c['date']}');
+            if (d != null) {
+              final at = DateTime(d.year, d.month, d.day, h, m);
+              if (at.isAfter(DateTime.now())) await _zoned(_id('care${c['id']}'), title, body, tz.TZDateTime.from(at, tz.local), _d('reminders', 'Reminders'));
+            }
+          default:
+            await _zoned(_id('care${c['id']}'), title, body, _nextAt(h, m), _d('reminders', 'Reminders'), repeat: DateTimeComponents.time);
+        }
+      }
+      // 7. Morning summary at 7 AM.
+      if (s.settings['morningSummary'] == true) {
+        final goals = s.list('goals').where((g) => g['archived'] != true).length;
+        final habits = s.list('habits').length;
+        await _zoned(_id('morning'), 'Good morning', '$goals goals and $habits habits today. One small step at a time.', _nextAt(7, 0), _d('nudges', 'Nudges'), repeat: DateTimeComponents.time);
+      }
+      // 8. Haircut.
       final hc = DateTime.tryParse('${s.settings['haircutNext'] ?? ''}');
       if (hc != null) {
         final when = DateTime(hc.year, hc.month, hc.day, 10);

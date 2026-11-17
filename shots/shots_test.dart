@@ -14,6 +14,7 @@ import 'package:lifeos/screens/goal_detail.dart';
 import 'package:lifeos/screens/explore.dart';
 import 'package:lifeos/screens/account.dart';
 import 'package:lifeos/screens/tools.dart';
+import 'package:lifeos/screens/tools_life.dart';
 import 'package:lifeos/widgets/ui.dart';
 
 Future<void> _font(String family, List<String> files) async {
@@ -31,11 +32,13 @@ Store seeded() {
   Map<String, dynamic> logs(int days, [int skip = 99]) => {for (var i = 0; i < days; i++) if (i != skip) d(i): true};
   s.setSetting('name', 'Rabby Hossain');
   s.setSetting('seeded', true);
+  final colors = [0xFFB8DB4A, 0xFFC7B8FF, 0xFF9FD3F2, 0xFFFFC9A8];
+  var ci = 0;
   for (final h in [('Wake before Fajr', logs(12)), ('Read Quran', logs(5)), ('Walk 20 min', logs(8, 0)), ('No phone after 11 PM', logs(3, 0))]) {
-    s.add('habits', {'name': h.$1, 'logs': h.$2});
+    s.add('habits', {'name': h.$1, 'color': colors[ci++], 'logs': h.$2});
   }
-  s.save('goals', {'id': 'g1', 'title': 'Read 24 books', 'area': 'Learn', 'target': 24, 'unit': 'books', 'logUnit': 'pages', 'perUnit': 300, 'step': 'Read 20 pages', 'why': 'I want to think deeper and be someone my family learns from.', 'logs': {d(60): 18.0, d(3): 1.2, d(1): 0.2, d(0): 0.05}, 'steps': [{'t': 'Pick the next 2 books', 'min': '5 min', 'done': true}, {'t': 'Read 20 pages after Isha', 'min': '25 min', 'done': false}]});
-  s.save('goals', {'id': 'g2', 'title': 'Lose 8 kg', 'area': 'Health', 'target': 8, 'unit': 'kg', 'step': 'Walk 8,000 steps', 'logs': {d(40): 4.0}, 'steps': []});
+  s.save('goals', {'id': 'g1', 'title': 'Read 24 books this year', 'icon': 'book', 'period': 'Yearly', 'amount': 24, 'plan': 'week', 'area': 'Learn', 'target': 24, 'unit': 'books', 'logUnit': 'pages', 'perUnit': 300, 'why': 'I want to think deeper and be someone my family learns from.', 'logs': {d(60): 18.0, d(3): 1.2, d(1): 0.2, d(0): 0.05}, 'steps': [{'t': 'Pick the next 2 books', 'min': '5 min', 'done': true}, {'t': 'Read 20 pages after Isha', 'min': '25 min', 'done': false}]});
+  s.save('goals', {'id': 'g2', 'title': 'Save 5,000 tk a month', 'icon': 'money', 'period': 'Monthly', 'amount': 5000, 'plan': 'month', 'area': 'Money', 'target': 60000, 'unit': 'tk', 'logs': {d(40): 50000.0, d(1): 160.0}, 'steps': []});
   for (var i = 0; i < 7; i++) {
     s.patchDay({'water': [6, 8, 5, 7, 6, 7, 5][i], 'mood': ['Okay', 'Good', 'Low', 'Good', 'Good', 'Great', 'Good'][i], 'sleepH': [6.5, 7, 5.8, 7.4, 6.9, 8, 7.2][i], 'steps': 6420, 'prayed': i == 6 ? ['Fajr', 'Dhuhr'] : ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']}, d(6 - i));
   }
@@ -44,15 +47,17 @@ Store seeded() {
   }
   s.add('focus', {'day': d(0), 'mins': 25, 'label': 'Work'});
   s.add('dates', {'title': "Mom's birthday", 'date': dayKey(now.add(const Duration(days: 3))), 'kind': 'Birthday', 'yearly': true});
-  s.add('trips', {'place': "Cox's Bazar", 'from': dayKey(now.add(const Duration(days: 28))), 'to': dayKey(now.add(const Duration(days: 31))), 'packing': [{'name': 'Passport / NID', 'done': true}, {'name': 'Charger', 'done': false}], 'plan': {'d1': ['Bus from Dhaka · 7 AM', 'Sunset at the beach']}});
-  s.add('courses', {'name': 'Arabic basics', 'total': 30, 'done': 12, 'logs': {d(1): 1, d(2): 1}});
+  s.save('trips', {'id': 't1', 'kind': 'Trip', 'photos': [], 'place': "Cox's Bazar", 'from': dayKey(now.add(const Duration(days: 28))), 'to': dayKey(now.add(const Duration(days: 31))), 'packing': [{'name': 'Passport / NID', 'done': true}, {'name': 'Charger', 'done': false}], 'plan': {'d1': ['Bus from Dhaka · 7 AM', 'Sunset at the beach']}});
+  s.add('courses', {'name': 'Arabic basics', 'kind': 'YouTube', 'unit': 'videos', 'total': 30, 'done': 12, 'logs': {d(1): 1, d(2): 1}});
+  s.add('courses', {'name': 'Flutter course', 'kind': 'Course', 'unit': 'lessons', 'total': 40, 'done': 12, 'logs': {d(0): 2}});
   s.add('reminders', {'title': 'Take vitamins', 'times': ['09:00'], 'on': true});
   s.add('reminders', {'title': 'Call Mom', 'times': ['20:00'], 'on': true});
-  s.add('care', {'name': 'Cleanser', 'time': 'pm', 'logs': {d(0): true}});
-  s.add('care', {'name': 'Moisturizer', 'time': 'pm', 'logs': {}});
-  s.add('moments', {'title': 'First trip to Sajek', 'note': 'With Rafi and Tanim', 'date': '${now.year - 1}-${dayKey(now).substring(5)}'});
+  s.add('care', {'name': 'Face wash + sunscreen', 'time': '08:00', 'repeat': 'Every day', 'remind': true, 'logs': {d(0): true}});
+  s.add('care', {'name': 'Oil hair', 'time': '21:00', 'repeat': 'Every day', 'remind': true, 'logs': {}});
+  s.add('moments', {'title': 'First trip to Sajek', 'note': 'With Rafi and Tanim', 'time': '18:40', 'kind': 'Trip', 'date': '${now.year - 1}-${dayKey(now).substring(5)}'});
   s.setSetting('license', {'key': 'LIFE-AB12-CD34-7Q2K'});
-  s.setSetting('pins', ['prayer', 'focus', 'journal']);
+  s.setSetting('pins', ['prayer', 'dhikr', 'journal']);
+  s.patchDay({'dayType': 'Positive', 'text': 'Long tea talk with Abbu', 'dhikrCounts': {'SubhanAllah': 12}}, d(0));
   return s;
 }
 
@@ -66,24 +71,40 @@ void main() {
   });
 
   final screens = <String, Widget Function()>{
-    '01-home': () => Container(decoration: BoxDecoration(gradient: bgGradient), child: HomeTab(onTab: (_) {})),
-    '02-goals': () => Container(decoration: BoxDecoration(gradient: bgGradient), child: const GoalsTab()),
+    '01-home': () => Container(decoration: bgDecoration, child: HomeTab(onTab: (_) {})),
+    '02-goals': () => Container(decoration: bgDecoration, child: const GoalsTab()),
     '03-goal-detail': () => const GoalDetail(id: 'g1'),
     '04-new-goal': () => const AddGoalPage(),
     '05-review': () => const ReviewPage(),
-    '06-explore': () => Container(decoration: BoxDecoration(gradient: bgGradient), child: const ExploreTab()),
-    '07-account': () => Container(decoration: BoxDecoration(gradient: bgGradient), child: const AccountTab()),
+    '06-explore': () => Container(decoration: bgDecoration, child: const ExploreTab()),
+    '07-account': () => Container(decoration: bgDecoration, child: const AccountTab()),
     for (var i = 0; i < tools.length; i++) '${(10 + i)}-${tools[i].key}': tools[i].page,
+    '40-xp': () => const XpPage(),
+    '41-backup': () => const BackupPage(),
+    '42-theme': () => const ThemePage(),
+    '43-prefs': () => const PrefsPage(),
+    '44-howto': () => const HowToPage(),
+    '45-about': () => const AboutPage(version: '26.1.0'),
+    '46-feedback': () => const FeedbackPage(version: '26.1.0'),
+    '47-trip': () => const TripPage(id: 't1'),
+    '48-memory-new': () => const MemoryEditPage(),
+    '49-goal-edit': () => const AddGoalPage(id: 'g1'),
+    '60-home-dark': () => Container(decoration: bgDecoration, child: HomeTab(onTab: (_) {})),
+    '61-goal-dark': () => const GoalDetail(id: 'g1'),
+    '62-account-dark': () => Container(decoration: bgDecoration, child: const AccountTab()),
+    '63-food-dark': () => toolOf('food').page(),
   };
 
   for (final e in screens.entries) {
     testWidgets(e.key, (tester) async {
       tester.view.physicalSize = const Size(780, 3400);
       tester.view.devicePixelRatio = 2;
+      await Local.sp.setString('mode', e.key.endsWith('-dark') ? 'Dark' : 'Light');
+      Look.apply(Brightness.light);
       final s = seeded();
       await tester.pumpWidget(ChangeNotifierProvider<Store>.value(
         value: s,
-        child: MaterialApp(debugShowCheckedModeBanner: false, theme: ThemeData(fontFamily: 'Geist', useMaterial3: true), home: Scaffold(backgroundColor: const Color(0xFFF1EEF4), body: SafeArea(child: e.value()))),
+        child: MaterialApp(debugShowCheckedModeBanner: false, theme: ThemeData(fontFamily: 'Geist', useMaterial3: true), home: Scaffold(backgroundColor: bgGradient.colors[1], body: SafeArea(child: e.value()))),
       ));
       for (var i = 0; i < 30; i++) {
         await tester.pump(const Duration(milliseconds: 100));

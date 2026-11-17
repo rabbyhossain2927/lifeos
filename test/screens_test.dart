@@ -12,6 +12,7 @@ import 'package:lifeos/screens/goal_detail.dart';
 import 'package:lifeos/screens/explore.dart';
 import 'package:lifeos/screens/account.dart';
 import 'package:lifeos/screens/tools.dart';
+import 'package:lifeos/screens/tools_life.dart';
 
 void main() {
   setUpAll(() async {
@@ -28,6 +29,16 @@ void main() {
     'Explore': () => const ExploreTab(),
     'Account': () => const AccountTab(),
     for (final tl in tools) 'Tool ${tl.name}': tl.page,
+    'XP dashboard': () => const XpPage(),
+    'Backup': () => const BackupPage(),
+    'Theme': () => const ThemePage(),
+    'Preferences': () => const PrefsPage(),
+    'How to use': () => const HowToPage(),
+    'About': () => const AboutPage(version: '26.1.0'),
+    'Feedback': () => const FeedbackPage(version: '26.1.0'),
+    'Trip page': () => const TripPage(id: 't1'),
+    'New memory': () => const MemoryEditPage(),
+    'Edit goal': () => const AddGoalPage(id: 'g1'),
   };
 
   for (final e in screens.entries) {
@@ -38,7 +49,7 @@ void main() {
       // Like data coming back from the PHP server: empty maps arrive as [].
       store.add('habits', {'name': 'Read', 'logs': cleanDoc({'logs': []})['logs']});
       store.save('goals', cleanDoc({'id': 'g1', 'title': 'Read 24 books', 'target': 24, 'unit': 'books', 'logUnit': 'pages', 'perUnit': 300, 'logs': [], 'steps': [{'t': 'Pick a book', 'min': '5 min', 'done': false}]}));
-      store.add('trips', cleanDoc({'place': 'Sylhet', 'from': '2099-01-01', 'to': '2099-01-03', 'packing': [], 'plan': []}));
+      store.save('trips', cleanDoc({'id': 't1', 'place': 'Sylhet', 'from': '2099-01-01', 'to': '2099-01-03', 'packing': [], 'plan': []}));
       store.add('courses', cleanDoc({'name': 'Arabic', 'total': 20, 'done': 3, 'logs': []}));
       store.add('dates', cleanDoc({'title': 'Mom', 'date': '1970-12-01', 'yearly': true}));
       store.add('moments', cleanDoc({'title': 'Trip', 'date': '2025-01-01'}));

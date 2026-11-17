@@ -86,7 +86,13 @@ class Backup {
     return client == null ? null : drive.DriveApi(client);
   }
 
-  static Future<bool> driveConnected() async => (await _drive(ask: false)) != null;
+  static Future<bool> driveConnected() async {
+    try {
+      return (await _drive(ask: false)) != null;
+    } catch (_) {
+      return false;
+    }
+  }
 
   static Future<void> toDrive(Store s, {bool ask = true}) async {
     final api = await _drive(ask: ask);

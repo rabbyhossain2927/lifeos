@@ -7,7 +7,9 @@ import '../services/store.dart';
 import '../widgets/kit.dart';
 import '../widgets/motion.dart';
 import '../widgets/ui.dart';
+import 'account.dart';
 import 'shell.dart';
+import 'tools_daily.dart';
 import 'tools.dart';
 
 const quickFoods = [('Rice plate', 340), ('Dal bowl', 150), ('Roti', 120), ('Egg', 80), ('Chicken curry', 300), ('Banana', 90), ('Tea', 40)];
@@ -255,6 +257,49 @@ class HomeTab extends StatelessWidget {
       ]),
       Text("Let's make today count", style: t(22, w: w6, ls: -0.4), maxLines: 1, overflow: TextOverflow.ellipsis),
       bento,
+      // XP: tap for the dashboard.
+      Press(
+        onTap: () => push(context, const XpPage()),
+        label: 'XP dashboard',
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
+          decoration: BoxDecoration(color: C.white, borderRadius: BorderRadius.circular(22)),
+          child: Row(children: [
+            Transform.scale(scale: 0.72, child: LevelBadge(level: s.lvl)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Col([
+                Row(children: [Expanded(child: Text('Level ${s.lvl} · ${s.lvlName}', style: t(13.5, w: w6))), Text('${s.xpInLevel} / 1000 XP', style: t(12, w: w6, c: C.muted))]),
+                Bar(s.xpInLevel / 1000, height: 6, color: C.lime2),
+              ], space: 6),
+            ),
+            const SizedBox(width: 6),
+            Icon(Icons.chevron_right_rounded, color: C.muted),
+          ]),
+        ),
+      ),
+      Builder(builder: (_) {
+        final ins = s.sleepInsight;
+        String hm(double x) => '${x.floor()}h ${((x % 1) * 60).round().toString().padLeft(2, '0')}m';
+        return Press(
+          onTap: () => openTool(context, 'sleep'),
+          label: 'Sleep overview',
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: C.white, borderRadius: BorderRadius.circular(22)),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(width: 40, height: 40, decoration: BoxDecoration(color: C.limeSoft, borderRadius: BorderRadius.circular(13)), child: Icon(Icons.bedtime_outlined, size: 19, color: C.limeText)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Col([
+                  Row(children: [Expanded(child: Text('Sleep overview', style: t(14, w: w6))), Text(ins.$1 > 0 ? '${hm(ins.$1)} avg' : '7 days', style: t(12, w: w6, c: C.muted))]),
+                  Text(ins.$3, style: t(12.5, c: C.muted, h: 1.4)),
+                ], space: 4),
+              ),
+            ]),
+          ),
+        );
+      }),
       if (pins.isNotEmpty)
         SizedBox(
           height: 46,
@@ -311,39 +356,28 @@ class HomeTab extends StatelessWidget {
         ], 6)),
       ),
       RowsPanel(
-        title: 'Habits',
-        hint: '$hDone of ${habits.length}',
+        title: 'Habits this week',
+        hint: 'tap a box · $hDone of ${habits.length} today',
         empty: 'Add a habit with the + button.',
-        rows: [
-          for (final x in habits)
-            Row2(
-              title: '${x['name']}',
-              right: s.streak(x) > 0 ? '${s.streak(x)} days' : null,
-              done: s.habitDone(x),
-              onTick: () => s.toggleHabit(x),
-            ),
-        ],
+        rows: [for (final x in habits) habitRow(context, s, x)],
       ),
       IntrinsicHeight(
         child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: gap([
           Expanded(
             child: Panel(
               title: 'Water',
-              hint: '$water / ${s.waterGoal}',
-              child: Wrap(spacing: 6, runSpacing: 6, children: [
+              hint: '${s.waterMlOn()} ml',
+              child: Wrap(spacing: 4, runSpacing: 6, children: [
                 for (var i = 0; i < 8; i++)
                   Press(
-                    onTap: () => s.setWater(i + 1 == water ? i : i + 1),
+                    onTap: () {
+                      final ml = s.waterMlOn(), g = s.glassMl;
+                      s.setWaterMl(ml >= (i + 1) * g && ml < (i + 2) * g ? i * g : (i + 1) * g);
+                    },
                     haptic: Haptic.select,
                     label: 'Glass ${i + 1}',
-                    scale: 0.85,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      width: 30,
-                      height: 34,
-                      decoration: BoxDecoration(color: i < water ? const Color(0xFFBFE3F7) : C.chip, borderRadius: BorderRadius.circular(10)),
-                      child: Icon(Icons.local_drink_outlined, size: 15, color: i < water ? const Color(0xFF1F4F86) : C.border),
-                    ),
+                    scale: 0.88,
+                    child: SizedBox(width: 30, height: 36, child: Center(child: GlassIcon(fill: ((s.waterMlOn() - i * s.glassMl) / s.glassMl).clamp(0.0, 1.0), size: 32, strong: s.waterMlOn() > i * s.glassMl))),
                   ),
               ]),
             ),
@@ -420,19 +454,20 @@ class HomeTab extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Focus', style: t(15, w: w6)),
-                Text(focus == 0 ? 'No session yet today' : '$focus min focused today', style: t(12, c: C.muted)),
+                Text('Today ${_mins(focus)} · Total ${_mins(s.list('focus').fold<int>(0, (a, f) => a + ((f['mins'] ?? 0) as num).toInt()))}', style: t(12, c: C.muted)),
               ]),
             ),
             Container(
               height: 44,
               padding: const EdgeInsets.symmetric(horizontal: 18),
-              alignment: Alignment.center,
               decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(999)),
-              child: Text('Start', style: t(14, w: w6, c: C.white)),
+              child: Center(widthFactor: 1, child: Text('Start', style: t(14, w: w6, c: C.white))),
             ),
           ]),
         ),
       ),
     ]);
   }
+
+  String _mins(int m) => m >= 60 ? '${m ~/ 60}h ${(m % 60).toString().padLeft(2, '0')}m' : '${m}m';
 }
