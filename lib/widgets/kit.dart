@@ -198,11 +198,13 @@ class Chip2 extends StatelessWidget {
   final VoidCallback onTap;
   final Color? _off;
   Color get off => _off ?? C.chip;
-  const Chip2(this.text, {super.key, this.on = false, this.add = false, required this.onTap, Color? off}) : _off = off;
+  final VoidCallback? onLong;
+  const Chip2(this.text, {super.key, this.on = false, this.add = false, required this.onTap, Color? off, this.onLong}) : _off = off;
   @override
   Widget build(BuildContext context) {
     return Press(
       onTap: onTap,
+      onLongPress: onLong,
       label: text,
       selected: on,
       haptic: add ? Haptic.success : Haptic.select,
@@ -232,10 +234,11 @@ class Chips extends StatelessWidget {
   final bool add;
   final Color? _off;
   Color get off => _off ?? C.chip;
-  const Chips({super.key, required this.options, this.selected = const {}, required this.onTap, this.add = false, Color? off}) : _off = off;
+  final ValueChanged<String>? onLong;
+  const Chips({super.key, required this.options, this.selected = const {}, required this.onTap, this.add = false, Color? off, this.onLong}) : _off = off;
   @override
   Widget build(BuildContext context) => Wrap(spacing: 8, runSpacing: 8, children: [
-        for (final o in options) Chip2(o, on: selected.contains(o), add: add, off: off, onTap: () => onTap(o)),
+        for (final o in options) Chip2(o, on: selected.contains(o), add: add, off: off, onTap: () => onTap(o), onLong: onLong == null ? null : () => onLong!(o)),
       ]);
 }
 
@@ -247,7 +250,8 @@ class Stepper2 extends StatelessWidget {
   final double size;
   final Color? _bg;
   Color get bg => _bg ?? C.chip;
-  const Stepper2({super.key, required this.value, this.unit = '', required this.onMinus, required this.onPlus, this.size = 24, Color? bg}) : _bg = bg;
+  final ValueChanged<num>? onType;
+  const Stepper2({super.key, required this.value, this.unit = '', required this.onMinus, required this.onPlus, this.size = 24, Color? bg, this.onType}) : _bg = bg;
   @override
   Widget build(BuildContext context) {
     Widget btn(String s, VoidCallback f, Color c, String label) => Press(
@@ -255,7 +259,7 @@ class Stepper2 extends StatelessWidget {
           label: label,
           haptic: Haptic.select,
           scale: 0.88,
-          child: Container(width: 48, height: 48, alignment: Alignment.center, decoration: BoxDecoration(color: c, shape: BoxShape.circle), child: Text(s, style: t(22))),
+          child: Container(width: 48, height: 48, alignment: Alignment.center, decoration: BoxDecoration(color: c, shape: BoxShape.circle), child: Text(s, style: t(22, c: c == C.lime ? C.onLime : C.ink))),
         );
     return Container(
       padding: const EdgeInsets.all(5),
@@ -263,9 +267,17 @@ class Stepper2 extends StatelessWidget {
       child: Row(children: [
         btn('−', onMinus, C.white, 'Less'),
         Expanded(
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 160),
-            transitionBuilder: (c, a) => ScaleTransition(scale: Tween(begin: 0.85, end: 1.0).animate(a), child: FadeTransition(opacity: a, child: c)),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onType == null
+                ? null
+                : () async {
+                    final v = await askNumber(context, unit.isEmpty ? 'Type a number' : 'Type the amount ($unit)', value.replaceAll(RegExp(r'[^0-9.]'), ''));
+                    if (v != null) onType!(v);
+                  },
+            child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            transitionBuilder: (c, a) => FadeTransition(opacity: a, child: c),
             child: Text.rich(
               key: ValueKey(value),
               TextSpan(children: [
@@ -274,6 +286,7 @@ class Stepper2 extends StatelessWidget {
               ]),
               textAlign: TextAlign.center,
             ),
+          ),
           ),
         ),
         btn('+', onPlus, C.lime, 'More'),
@@ -288,17 +301,26 @@ class Row2 extends StatelessWidget {
   final String? sub, right;
   final bool? done;
   final VoidCallback? onTick, onTap, onLongPress;
-  final Widget? trailing, leading;
+  final Widget? trailing, leading, below;
   final bool divider;
   final double? progress;
-  const Row2({super.key, required this.title, this.sub, this.right, this.done, this.onTick, this.onTap, this.onLongPress, this.trailing, this.leading, this.divider = true, this.progress});
+
+  /// Swipe left to delete (needs [swipeId]); Undo calls [onUndo].
+  final String? swipeId;
+  final VoidCallback? onDelete, onUndo, onDots;
+  const Row2({super.key, required this.title, this.sub, this.right, this.done, this.onTick, this.onTap, this.onLongPress, this.trailing, this.leading, this.below, this.divider = true, this.progress, this.swipeId, this.onDelete, this.onUndo, this.onDots});
+
+  Row2 last() => Row2(
+      title: title, sub: sub, right: right, done: done, onTick: onTick, onTap: onTap, onLongPress: onLongPress, trailing: trailing, leading: leading, below: below,
+      divider: false, progress: progress, swipeId: swipeId, onDelete: onDelete, onUndo: onUndo, onDots: onDots);
+
   @override
   Widget build(BuildContext context) {
     final struck = done == true && onTick != null;
-    final row = Container(
+    Widget row = Container(
       constraints: const BoxConstraints(minHeight: 54),
-      padding: EdgeInsets.only(top: 8, bottom: progress != null ? 4 : 8),
-      decoration: BoxDecoration(border: divider ? Border(bottom: BorderSide(color: C.line)) : null),
+      padding: EdgeInsets.only(top: 8, bottom: progress != null || below != null ? 4 : 8),
+      decoration: BoxDecoration(color: C.white, border: divider ? Border(bottom: BorderSide(color: C.line)) : null),
       child: Column(children: [
         Row(children: [
           if (onTick != null) ...[TickCircle(done: done == true, onTap: onTick!, label: title), const SizedBox(width: 12)],
@@ -307,20 +329,23 @@ class Row2 extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 200),
-                style: t(15, w: w5, c: struck ? const Color(0xFF8A8A84) : C.ink, deco: struck ? TextDecoration.lineThrough : null),
+                style: t(14.5, w: w5, c: struck ? const Color(0xFF8E8E96) : C.ink, deco: struck ? TextDecoration.lineThrough : null),
                 child: Text(title),
               ),
-              if (sub != null && sub!.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text(sub!, style: t(12, c: C.muted))),
+              if (sub != null && sub!.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text(sub!, style: t(11.5, c: C.muted))),
             ]),
           ),
-          if (right != null) Text(right!, style: t(13, w: w6, c: const Color(0xFF3F3F46))),
+          if (right != null) Text(right!, style: t(12.5, w: w6, c: C.ink.withValues(alpha: 0.8))),
           if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+          if (onDots != null) ...[const SizedBox(width: 2), DotsBtn(onTap: onDots!, label: 'More for $title')],
         ]),
+        if (below != null) Padding(padding: const EdgeInsets.only(top: 8, bottom: 6), child: below!),
         if (progress != null) Padding(padding: const EdgeInsets.only(top: 8, bottom: 6), child: Bar(progress!, height: 6)),
       ]),
     );
-    if (onTap == null && onLongPress == null) return row;
-    return Press(onTap: onTap, onLongPress: onLongPress, scale: 0.98, child: row);
+    if (onTap != null || onLongPress != null) row = Press(onTap: onTap, onLongPress: onLongPress, scale: 0.98, child: row);
+    if (onDelete != null) row = SwipeDelete(id: swipeId ?? title, onDelete: onDelete!, onUndo: onUndo, what: '"$title" deleted', child: row);
+    return row;
   }
 }
 
@@ -338,24 +363,7 @@ class RowsPanel extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
       child: rows.isEmpty
           ? Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(empty, style: t(13, c: C.muted)))
-          : Column(children: [
-              for (var i = 0; i < rows.length; i++)
-                i == rows.length - 1
-                    ? Row2(
-                        title: rows[i].title,
-                        sub: rows[i].sub,
-                        right: rows[i].right,
-                        done: rows[i].done,
-                        onTick: rows[i].onTick,
-                        onTap: rows[i].onTap,
-                        onLongPress: rows[i].onLongPress,
-                        trailing: rows[i].trailing,
-                        leading: rows[i].leading,
-                        progress: rows[i].progress,
-                        divider: false,
-                      )
-                    : rows[i],
-            ]),
+          : Column(children: [for (var i = 0; i < rows.length; i++) i == rows.length - 1 ? rows[i].last() : rows[i]]),
     );
   }
 }
@@ -601,4 +609,126 @@ class HeadPill extends StatelessWidget {
 void say(BuildContext context, String msg, {bool good = true}) {
   good ? Haptic.success() : Haptic.warn();
   toast(context, msg);
+}
+
+
+/// Asks for a number in a small sheet. Returns null if cancelled.
+Future<num?> askNumber(BuildContext context, String title, [String initial = '']) async {
+  final c = TextEditingController(text: initial);
+  num? out;
+  await showSheet(context, title, (ctx, _) => Col([
+        TextField(
+          controller: c,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: t(24, w: w6),
+          textAlign: TextAlign.center,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: C.chip,
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide.none),
+          ),
+        ),
+        PressPill('Done', onTap: () {
+          out = num.tryParse(c.text.trim().replaceAll(',', ''));
+          Navigator.pop(ctx);
+        }),
+      ], space: 12));
+  return out;
+}
+
+/// One line of the ⋯ menu.
+class MenuItem {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool danger;
+  const MenuItem(this.label, this.icon, this.onTap, {this.danger = false});
+}
+
+/// Bottom-sheet menu (Edit, Move, Delete…).
+void showMenuSheet(BuildContext context, String title, List<MenuItem> items) {
+  showSheet(context, title, (ctx, _) => Col([
+        for (final m in items)
+          Press(
+            onTap: () {
+              Navigator.pop(ctx);
+              m.onTap();
+            },
+            haptic: m.danger ? Haptic.warn : Haptic.tap,
+            label: m.label,
+            child: Container(
+              height: 52,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(color: m.danger ? C.warnSoft : C.chip, borderRadius: BorderRadius.circular(16)),
+              child: Row(children: [
+                Icon(m.icon, size: 19, color: m.danger ? C.warn : C.ink),
+                const SizedBox(width: 12),
+                Text(m.label, style: t(14.5, w: w5, c: m.danger ? C.warn : C.ink)),
+              ]),
+            ),
+          ),
+      ], space: 8));
+}
+
+/// The ⋯ button on a row.
+class DotsBtn extends StatelessWidget {
+  final VoidCallback onTap;
+  final String label;
+  const DotsBtn({super.key, required this.onTap, this.label = 'More'});
+  @override
+  Widget build(BuildContext context) => Press(
+        onTap: onTap,
+        label: label,
+        scale: 0.9,
+        child: SizedBox(width: 36, height: 36, child: Icon(Icons.more_horiz_rounded, size: 20, color: C.muted)),
+      );
+}
+
+/// Swipe left to delete, with Undo.
+class SwipeDelete extends StatelessWidget {
+  final String id;
+  final Widget child;
+  final VoidCallback onDelete;
+  final VoidCallback? onUndo;
+  final String what;
+  const SwipeDelete({super.key, required this.id, required this.child, required this.onDelete, this.onUndo, this.what = 'Deleted'});
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: ValueKey('swipe-$id'),
+      direction: DismissDirection.endToStart,
+      dismissThresholds: const {DismissDirection.endToStart: 0.35},
+      movementDuration: const Duration(milliseconds: 220),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(color: const Color(0xFFE5484D), borderRadius: BorderRadius.circular(14)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 20),
+          const SizedBox(width: 6),
+          Text('Delete', style: t(13, w: w6, c: Colors.white)),
+        ]),
+      ),
+      onUpdate: (d) {
+        if (d.reached && !d.previousReached) Haptic.select();
+      },
+      onDismissed: (_) {
+        Haptic.warn();
+        onDelete();
+        final m = ScaffoldMessenger.of(context);
+        m.hideCurrentSnackBar();
+        m.showSnackBar(SnackBar(
+          content: Text(what, style: t(14, c: C.white)),
+          backgroundColor: C.ink,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          duration: const Duration(seconds: 4),
+          action: onUndo == null ? null : SnackBarAction(label: 'Undo', textColor: C.lime, onPressed: onUndo!),
+        ));
+      },
+      child: child,
+    );
+  }
 }

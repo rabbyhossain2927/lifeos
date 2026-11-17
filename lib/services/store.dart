@@ -11,7 +11,7 @@ typedef Json = Map<String, dynamic>;
 
 /// PHP turns an empty JSON object {} into [] on its way back from the server.
 /// These fields are always maps, so an empty list there means an empty map.
-const _mapFields = {'logs', 'duas', 'reset', 'license', 'plan', 'review'};
+const _mapFields = {'logs', 'duas', 'reset', 'license', 'plan', 'review', 'dhikrCounts', 'planAmounts', 'logNotes'};
 
 Json cleanDoc(Object? raw) {
   if (raw is! Map) return <String, dynamic>{};

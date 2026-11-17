@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lifeos/services/local.dart';
 import 'package:lifeos/services/store.dart';
 import 'package:lifeos/screens/goals.dart';
 
@@ -22,6 +24,11 @@ class FakeApp extends StatelessWidget {
 }
 
 void main() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await Local.init();
+  });
+
   testWidgets('tabs find the Store after signing in', (tester) async {
     final errors = <String>[];
     final old = FlutterError.onError;

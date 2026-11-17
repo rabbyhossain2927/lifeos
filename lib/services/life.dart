@@ -25,11 +25,81 @@ extension Life on Store {
     patchDay({'prayed': l.toList()});
   }
 
-  // ---- water
-  int waterOn([String? k]) => ((day(k)['water'] ?? 0) as num).toInt();
-  int get waterGoal => ((settings['waterGoal'] ?? 8) as num).toInt();
+  // ---- water (saved in ml; older days only had glasses)
   int get glassMl => ((settings['glass'] ?? 250) as num).toInt();
-  void setWater(int n) => patchDay({'water': n < 0 ? 0 : n});
+  int waterMlOn([String? k]) {
+    final d = day(k);
+    if (d['waterMl'] is num) return (d['waterMl'] as num).toInt();
+    return ((d['water'] ?? 0) as num).toInt() * glassMl;
+  }
+
+  int get waterGoalMl => ((settings['waterGoalMl'] ?? ((settings['waterGoal'] ?? 8) as num) * glassMl) as num).toInt();
+  int waterOn([String? k]) => (waterMlOn(k) / glassMl).round();
+  int get waterGoal => (waterGoalMl / glassMl).round();
+  void setWaterMl(int ml) {
+    final v = ml < 0 ? 0 : ml;
+    patchDay({'waterMl': v, 'water': (v / glassMl).round()});
+  }
+
+  void setWater(int glasses) => setWaterMl(glasses * glassMl);
+
+  // ---- dhikr: list in settings, counts per day
+  static const defaultDhikr = [
+    {'name': 'SubhanAllah', 'meaning': 'Glory be to Allah', 'target': 33},
+    {'name': 'Alhamdulillah', 'meaning': 'All praise is for Allah', 'target': 33},
+    {'name': 'Allahu Akbar', 'meaning': 'Allah is the Greatest', 'target': 34},
+    {'name': 'Astaghfirullah', 'meaning': 'I seek forgiveness from Allah', 'target': 100},
+  ];
+  List<Map<String, dynamic>> get dhikrs => ((settings['dhikrs'] as List?) ?? defaultDhikr).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  Map<String, dynamic> dhikrCounts([String? k]) => Map<String, dynamic>.from(day(k)['dhikrCounts'] as Map? ?? {});
+  int dhikrTotal([String? k]) => dhikrCounts(k).values.fold<int>(0, (a, v) => a + ((v ?? 0) as num).toInt());
+
+  // ---- sleep insight from the last 7 nights
+  (double avg, int short, String text) get sleepInsight {
+    final nights = [for (final k in last7) sleepOn(k)].where((h) => h > 0).toList();
+    if (nights.isEmpty) return (0, 0, 'Log how long you slept to see how sleep affects your days.');
+    final avg = nights.reduce((a, b) => a + b) / nights.length;
+    final short = nights.where((h) => h < 6).length;
+    final lowMoodShort = last7.where((k) => sleepOn(k) > 0 && sleepOn(k) < 6 && moodScore(day(k)['mood']) > 0 && moodScore(day(k)['mood']) <= 2).length;
+    final text = avg >= 7
+        ? 'Great rhythm. ${avg.toStringAsFixed(1)}h a night keeps focus and mood steady.${short > 0 ? ' $short short night${short == 1 ? '' : 's'} this week.' : ''}'
+        : avg >= 6
+            ? 'A little short. Try going to bed 30 minutes earlier.${lowMoodShort > 0 ? ' On short nights your mood was low.' : ''}'
+            : 'Too little sleep this week. Energy, mood and hunger control drop. Aim for 7 hours.';
+    return (avg, short, text);
+  }
+
+  // ---- XP per day (same rules as points)
+  int xpOn(String k) {
+    var p = 0;
+    for (final h in list('habits')) {
+      if ((h['logs'] as Map? ?? {})[k] == true) p += 5;
+    }
+    for (final g in list('goals')) {
+      if ((g['logs'] as Map? ?? {})[k] != null) p += 10;
+    }
+    final d = day(k);
+    if ('${d['text'] ?? ''}'.trim().isNotEmpty) p += 5;
+    p += ((d['wins'] as List?) ?? const []).length * 2;
+    p += ((d['prayed'] as List?) ?? const []).length * 10;
+    return p;
+  }
+
+  /// Where XP came from over [days] ("Prayers" -> xp).
+  Map<String, int> xpSources(List<String> days) {
+    var pr = 0, go = 0, ha = 0, jo = 0;
+    for (final k in days) {
+      pr += prayedOn(k).length * 10;
+      jo += '${day(k)['text'] ?? ''}'.trim().isNotEmpty ? 5 : 0;
+      for (final h in list('habits')) {
+        if ((h['logs'] as Map? ?? {})[k] == true) ha += 5;
+      }
+      for (final g in list('goals')) {
+        if ((g['logs'] as Map? ?? {})[k] != null) go += 10;
+      }
+    }
+    return {'Prayers': pr, 'Goal steps': go, 'Habits': ha, 'Journal': jo};
+  }
 
   // ---- food
   int get kcalGoal => ((settings['kcalGoal'] ?? 2000) as num).toInt();
