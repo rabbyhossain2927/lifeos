@@ -47,7 +47,7 @@ class _ExploreTabState extends State<ExploreTab> {
         decoration: InputDecoration(
           hintText: 'Find a tool…',
           hintStyle: t(15, c: const Color(0xFF8A8A84)),
-          prefixIcon: const Icon(Icons.search_rounded, color: C.muted, size: 20),
+          prefixIcon: Icon(Icons.search_rounded, color: C.muted, size: 20),
           filled: true,
           fillColor: C.white,
           contentPadding: const EdgeInsets.symmetric(vertical: 16),
@@ -151,7 +151,7 @@ class _ExploreTabState extends State<ExploreTab> {
                       child: AnimatedScale(
                         scale: editing ? 1 : 0,
                         duration: const Duration(milliseconds: 260),
-                        curve: Curves.easeOutBack,
+                        curve: Curves.easeOutCubic,
                         child: Press(
                           onTap: () {
                             final k = sec.$2[i].key;

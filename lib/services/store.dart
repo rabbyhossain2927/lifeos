@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'local.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -344,7 +345,7 @@ class Store extends ChangeNotifier {
 
   Map<String, num> goalProgress(Json g) {
     final now = DateTime.now();
-    final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday - Local.weekStartDay + 7) % 7));
     return {
       'year': _sumLogs(g, (d) => d.year == now.year),
       'month': _sumLogs(g, (d) => d.year == now.year && d.month == now.month),
@@ -418,7 +419,7 @@ class Store extends ChangeNotifier {
 
   double weekScore([int weeksAgo = 0]) {
     final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1 + 7 * weeksAgo));
+    final start = DateTime(now.year, now.month, now.day).subtract(Duration(days: (now.weekday - Local.weekStartDay + 7) % 7 + 7 * weeksAgo));
     var sum = 0.0, n = 0;
     for (var i = 0; i < 7; i++) {
       final d = start.add(Duration(days: i));

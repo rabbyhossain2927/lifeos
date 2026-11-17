@@ -69,7 +69,7 @@ class _AccountTabState extends State<AccountTab> {
     final theme = '${s.settings['theme'] ?? 'Light'}';
 
     Widget icon(IconData i, (Color, Color) c) => Container(width: 36, height: 36, decoration: BoxDecoration(color: c.$1, borderRadius: BorderRadius.circular(12)), child: Icon(i, size: 18, color: c.$2));
-    const lime = (C.limeSoft, Color(0xFF4D5A10)), violet = (Color(0xFFEFEDFF), Color(0xFF4A3FB0)), blue = (Color(0xFFE7F1FB), Color(0xFF1F4F86)), grey = (C.chip, Color(0xFF4A4A52));
+    final lime = (C.limeSoft, Color(0xFF4D5A10)), violet = (Color(0xFFEFEDFF), Color(0xFF4A3FB0)), blue = (Color(0xFFE7F1FB), Color(0xFF1F4F86)), grey = (C.chip, Color(0xFF4A4A52));
     const chev = Icon(Icons.chevron_right_rounded, color: Color(0xFF8A8A84));
     Row2 link(String title, String sub, IconData i, (Color, Color) c, VoidCallback onTap) => Row2(title: title, sub: sub, leading: icon(i, c), trailing: chev, onTap: onTap);
 
@@ -142,7 +142,7 @@ class _AccountTabState extends State<AccountTab> {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(color: update == 'available' ? C.lime : C.chip, borderRadius: BorderRadius.circular(999)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                if (update == 'checking') ...[const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: C.ink)), const SizedBox(width: 6)],
+                if (update == 'checking') ...[SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: C.ink)), const SizedBox(width: 6)],
                 Text(update == 'checking' ? 'Wait' : update == 'available' ? 'Update' : 'Check', style: t(13, w: w6)),
               ]),
             ),
@@ -214,7 +214,7 @@ class LevelBadge extends StatelessWidget {
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
         tween: Tween(begin: 0.6, end: 1),
         duration: const Duration(milliseconds: 700),
-        curve: Curves.elasticOut,
+        curve: Curves.easeOutCubic,
         builder: (_, sc, child) => Transform.scale(scale: sc, child: child),
         child: SizedBox(
           width: 58,
@@ -327,7 +327,7 @@ void licenseSheet(BuildContext context) {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(22)),
           child: Col([
-            const Tag('PRO · ACTIVE', bg: C.lime, fg: C.ink),
+            Tag('PRO · ACTIVE', bg: C.lime, fg: C.ink),
             Text(k.length > 4 ? '${k.substring(0, k.length > 5 ? 5 : 0)}••••-${k.substring(k.length - 4)}' : k, style: t(17, w: w6, c: C.white, ls: 0.6)),
             Text('${l?['product'] ?? 'LifeOS Pro'} · works on every phone with this Google account', style: t(12, c: C.darkMuted)),
           ], space: 6),
@@ -451,7 +451,7 @@ void whatsNew(BuildContext context, String current) {
             for (final u in list) (niceVersion(u.version), [...u.added, ...u.fixed.map((f) => 'Fixed: $f')]),
           ];
           return Col([
-            if (snap.connectionState == ConnectionState.waiting) const LinearProgressIndicator(color: C.ink, backgroundColor: C.chip),
+            if (snap.connectionState == ConnectionState.waiting) LinearProgressIndicator(color: C.ink, backgroundColor: C.chip),
             for (final r in items)
               Container(
                 padding: const EdgeInsets.all(14),
@@ -459,7 +459,7 @@ void whatsNew(BuildContext context, String current) {
                 child: Col([
                   Row(children: [
                     Expanded(child: Text(r.$1, style: t(16, w: w6))),
-                    r.$1 == current ? const Tag('Installed', bg: C.ink, fg: C.white) : (UpdateService.isNewer(r.$1, current) ? const Tag('New', bg: C.lime, fg: C.ink) : const Tag('Older', bg: C.white)),
+                    r.$1 == current ? Tag('Installed', bg: C.ink, fg: C.white) : (UpdateService.isNewer(r.$1, current) ? Tag('New', bg: C.lime, fg: C.ink) : Tag('Older', bg: C.white)),
                   ]),
                   if (r.$2.isEmpty) Text('Small fixes.', style: t(14, c: C.muted)),
                   for (final i in r.$2.take(6))
@@ -595,7 +595,7 @@ void feedback(BuildContext context, String version) {
                 child: AnimatedScale(
                   scale: i <= stars ? 1 : 0.85,
                   duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOutBack,
+                  curve: Curves.easeOutCubic,
                   child: Icon(Icons.star_rounded, size: 40, color: i <= stars ? C.ink : const Color(0xFFDAD8DF)),
                 ),
               ),

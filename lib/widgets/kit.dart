@@ -31,7 +31,7 @@ class HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = tone == HeroTone.dark;
     final bg = switch (tone) { HeroTone.dark => C.ink, HeroTone.lime => C.lime, HeroTone.white => C.white };
-    final fg = dark ? C.white : C.ink;
+    final fg = dark ? C.white : (tone == HeroTone.lime ? C.onLime : C.ink);
     final soft = dark ? C.darkMuted : C.muted;
     return Container(
       width: double.infinity,
@@ -41,7 +41,7 @@ class HeroCard extends StatelessWidget {
         Row(children: [
           Expanded(
             child: Col([
-              Text(label, style: t(12, w: w6, c: dark ? C.lime : const Color(0xFF3F3F46))),
+              Text(label, style: t(12, w: w6, c: dark ? (Look.dark ? const Color(0xFF4D5A10) : C.lime) : (tone == HeroTone.lime ? C.onLime : C.muted))),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
                 transitionBuilder: (c, a) => FadeTransition(opacity: a, child: SlideTransition(position: Tween(begin: const Offset(0, 0.25), end: Offset.zero).animate(a), child: c)),
@@ -69,7 +69,7 @@ class HeroCard extends StatelessWidget {
               Expanded(
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOutBack,
+                  curve: Curves.easeOutCubic,
                   height: 34,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(color: d.$1 ? C.lime : (dark ? C.dark3 : C.chip), borderRadius: BorderRadius.circular(999)),
@@ -162,11 +162,14 @@ class Panel extends StatelessWidget {
 class PressPill extends StatelessWidget {
   final String text;
   final VoidCallback? onTap;
-  final Color bg, fg;
+  final Color? _bg;
+  Color get bg => _bg ?? C.ink;
+  final Color? _fg;
+  Color get fg => bg == C.lime ? C.onLime : (_fg ?? C.white);
   final double height;
   final IconData? icon;
   final bool success;
-  const PressPill(this.text, {super.key, this.onTap, this.bg = C.ink, this.fg = C.white, this.height = 56, this.icon, this.success = false});
+  const PressPill(this.text, {super.key, this.onTap, Color? bg, Color? fg, this.height = 56, this.icon, this.success = false}) : _bg = bg, _fg = fg;
   @override
   Widget build(BuildContext context) {
     return Press(
@@ -193,8 +196,9 @@ class Chip2 extends StatelessWidget {
   final String text;
   final bool on, add;
   final VoidCallback onTap;
-  final Color off;
-  const Chip2(this.text, {super.key, this.on = false, this.add = false, required this.onTap, this.off = C.chip});
+  final Color? _off;
+  Color get off => _off ?? C.chip;
+  const Chip2(this.text, {super.key, this.on = false, this.add = false, required this.onTap, Color? off}) : _off = off;
   @override
   Widget build(BuildContext context) {
     return Press(
@@ -213,7 +217,7 @@ class Chip2 extends StatelessWidget {
           border: Border.all(color: add ? C.border : (on ? C.ink : off), width: 1.5),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(add ? '+ $text' : text, style: t(14, w: w5)),
+          Text(add ? '+ $text' : text, style: t(13.5, w: w5, c: on && !add ? C.onLime : C.ink)),
         ]),
       ),
     );
@@ -226,8 +230,9 @@ class Chips extends StatelessWidget {
   final Set<String> selected;
   final ValueChanged<String> onTap;
   final bool add;
-  final Color off;
-  const Chips({super.key, required this.options, this.selected = const {}, required this.onTap, this.add = false, this.off = C.chip});
+  final Color? _off;
+  Color get off => _off ?? C.chip;
+  const Chips({super.key, required this.options, this.selected = const {}, required this.onTap, this.add = false, Color? off}) : _off = off;
   @override
   Widget build(BuildContext context) => Wrap(spacing: 8, runSpacing: 8, children: [
         for (final o in options) Chip2(o, on: selected.contains(o), add: add, off: off, onTap: () => onTap(o)),
@@ -240,8 +245,9 @@ class Stepper2 extends StatelessWidget {
   final String unit;
   final VoidCallback onMinus, onPlus;
   final double size;
-  final Color bg;
-  const Stepper2({super.key, required this.value, this.unit = '', required this.onMinus, required this.onPlus, this.size = 24, this.bg = C.chip});
+  final Color? _bg;
+  Color get bg => _bg ?? C.chip;
+  const Stepper2({super.key, required this.value, this.unit = '', required this.onMinus, required this.onPlus, this.size = 24, Color? bg}) : _bg = bg;
   @override
   Widget build(BuildContext context) {
     Widget btn(String s, VoidCallback f, Color c, String label) => Press(
@@ -292,7 +298,7 @@ class Row2 extends StatelessWidget {
     final row = Container(
       constraints: const BoxConstraints(minHeight: 54),
       padding: EdgeInsets.only(top: 8, bottom: progress != null ? 4 : 8),
-      decoration: BoxDecoration(border: divider ? const Border(bottom: BorderSide(color: C.line)) : null),
+      decoration: BoxDecoration(border: divider ? Border(bottom: BorderSide(color: C.line)) : null),
       child: Column(children: [
         Row(children: [
           if (onTick != null) ...[TickCircle(done: done == true, onTap: onTick!, label: title), const SizedBox(width: 12)],
@@ -371,7 +377,7 @@ class TickCircle extends StatelessWidget {
       haptic: done ? Haptic.tap : Haptic.success,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 260),
-        curve: Curves.easeOutBack,
+        curve: Curves.easeOutCubic,
         width: size,
         height: size,
         decoration: BoxDecoration(
@@ -382,8 +388,8 @@ class TickCircle extends StatelessWidget {
         child: AnimatedScale(
           scale: done ? 1 : 0,
           duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutBack,
-          child: Icon(Icons.check_rounded, size: size * 0.5, color: C.ink),
+          curve: Curves.easeOutCubic,
+          child: Icon(Icons.check_rounded, size: size * 0.5, color: C.onLime),
         ),
       ),
     );
@@ -472,8 +478,10 @@ const areaColors = <String, (Color, Color)>{
 
 class Tag extends StatelessWidget {
   final String text;
-  final Color bg, fg;
-  const Tag(this.text, {super.key, this.bg = C.chip, this.fg = const Color(0xFF4A4A52)});
+  final Color? _bg;
+  Color get bg => _bg ?? C.chip;
+  final Color fg;
+  const Tag(this.text, {super.key, Color? bg, this.fg = const Color(0xFF4A4A52)}) : _bg = bg;
   factory Tag.area(String a) {
     final c = areaColors[a] ?? (C.chip, const Color(0xFF4A4A52));
     return Tag(a, bg: c.$1, fg: c.$2);
@@ -482,7 +490,7 @@ class Tag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
-        child: Text(text, style: t(11, w: w6, c: fg)),
+        child: Text(text, style: t(11, w: w6, c: bg == C.lime ? C.onLime : fg)),
       );
 }
 
@@ -496,7 +504,7 @@ class BackBtn extends StatelessWidget {
         onTap: () => Navigator.of(context).maybePop(),
         label: label,
         scale: 0.9,
-        child: Container(width: 46, height: 46, decoration: const BoxDecoration(color: C.white, shape: BoxShape.circle), child: Icon(icon, size: 22)),
+        child: Container(width: 46, height: 46, decoration: BoxDecoration(color: C.white, shape: BoxShape.circle), child: Icon(icon, size: 22)),
       );
 }
 
@@ -514,7 +522,7 @@ class ToolPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
-        decoration: const BoxDecoration(gradient: bgGradient),
+        decoration: bgDecoration,
         child: SafeArea(
           bottom: false,
           child: ListView(

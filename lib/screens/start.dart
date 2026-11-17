@@ -6,7 +6,7 @@ import '../widgets/ui.dart';
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
   @override
-  Widget build(BuildContext context) => const Scaffold(backgroundColor: C.ink, body: Center(child: LogoMark(size: 96, tile: false)));
+  Widget build(BuildContext context) => Scaffold(backgroundColor: C.ink, body: Center(child: LogoMark(size: 96, tile: false)));
 }
 
 /// Sign in / sign up with Google (the first sign-in creates the account).
@@ -38,7 +38,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: bgGradient),
+        decoration: bgDecoration,
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
@@ -71,7 +71,7 @@ class SetupNeededScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: bgGradient),
+        decoration: bgDecoration,
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -194,7 +194,7 @@ class _LockGateState extends State<LockGate> with WidgetsBindingObserver {
                                 height: 72,
                                 child: Center(
                                   child: k == '<'
-                                      ? const Icon(Icons.backspace_outlined, color: C.white, semanticLabel: 'Delete')
+                                      ? Icon(Icons.backspace_outlined, color: C.white, semanticLabel: 'Delete')
                                       : Text(k, style: t(26, w: w5, c: C.white)),
                                 ),
                               ),

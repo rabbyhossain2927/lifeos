@@ -108,7 +108,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
     final fade = CurvedAnimation(parent: _fade, curve: Curves.easeOutCubic);
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(gradient: bgGradient),
+        decoration: bgDecoration,
         child: Stack(children: [
           Positioned.fill(
             child: SafeArea(
@@ -125,13 +125,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
           // + above the nav, right side, on Home and Goals.
           AnimatedPositioned(
             duration: const Duration(milliseconds: 320),
-            curve: Curves.easeOutBack,
+            curve: Curves.easeOutCubic,
             right: 20,
             bottom: (tab <= 1 ? 104 : 40) + bottom,
             child: AnimatedScale(
               scale: tab <= 1 ? 1 : 0,
               duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutBack,
+              curve: Curves.easeOutCubic,
               child: Press(
                 onTap: () => tab == 1 ? addGoalPage(context) : showAddSheet(context),
                 label: tab == 1 ? 'Add goal' : 'Add',
@@ -144,7 +144,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
                     shape: BoxShape.circle,
                     boxShadow: [BoxShadow(color: Color(0x29111111), blurRadius: 24, offset: Offset(0, 8))],
                   ),
-                  child: const Icon(Icons.add_rounded, size: 30, color: C.ink),
+                  child: Icon(Icons.add_rounded, size: 30, color: C.ink),
                 ),
               ),
             ),
@@ -168,7 +168,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
                     // The black pill slides to the chosen tab.
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 360),
-                      curve: Curves.easeOutBack,
+                      curve: Curves.easeOutCubic,
                       left: tab * (w + 4),
                       top: 0,
                       bottom: 0,

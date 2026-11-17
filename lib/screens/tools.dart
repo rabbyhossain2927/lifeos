@@ -20,8 +20,8 @@ class Tool {
   (Color, Color) get colors => groupColors[group]!;
 }
 
-const groupColors = {
-  'Daily': (C.lime, C.ink),
+final groupColors = {
+  'Daily': (C.lime, C.onLime),
   'Grow': (Color(0xFFEFEDFF), Color(0xFF4A3FB0)),
   'Life': (Color(0xFFFBEBEB), Color(0xFFA33A3A)),
 };

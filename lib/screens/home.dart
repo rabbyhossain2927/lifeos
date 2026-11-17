@@ -69,11 +69,11 @@ class HomeTab extends StatelessWidget {
     final sleepToday = s.sleepOn(todayKey) > 0 ? s.sleepOn(todayKey) : s.sleepOn(s.last7[5]);
     final pins = ((s.settings['pins'] as List?) ?? const []).map((e) => '$e').where((k) => tools.any((x) => x.key == k)).toList();
 
-    Widget tile(Widget child, {Color bg = C.white, double r = 22, VoidCallback? onTap, String? label}) => Press(
+    Widget tile(Widget child, {Color? bg, double r = 22, VoidCallback? onTap, String? label}) => Press(
           onTap: onTap,
           label: label,
           scale: 0.96,
-          child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(r)), child: child),
+          child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: bg ?? C.white, borderRadius: BorderRadius.circular(r)), child: child),
         );
     Widget small(String k, String v, Widget viz, String tool) => tile(
           SizedBox(height: 62, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(k, style: t(11, c: C.muted)), Text(v, style: t(16, w: w6)), viz])),
@@ -125,7 +125,7 @@ class HomeTab extends StatelessWidget {
                       for (final n in times.keys)
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutBack,
+                          curve: Curves.easeOutCubic,
                           width: 26,
                           height: 26,
                           alignment: Alignment.center,
@@ -243,7 +243,7 @@ class HomeTab extends StatelessWidget {
           onTap: () => openTool(context, 'reminders'),
           label: 'Reminders',
           scale: 0.9,
-          child: Container(width: 48, height: 48, decoration: const BoxDecoration(color: C.white, shape: BoxShape.circle), child: const Icon(Icons.notifications_none_rounded, size: 22)),
+          child: Container(width: 48, height: 48, decoration: BoxDecoration(color: C.white, shape: BoxShape.circle), child: const Icon(Icons.notifications_none_rounded, size: 22)),
         ),
       ]),
       Text("Let's make today count", style: t(22, w: w6, ls: -0.4), maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -357,7 +357,7 @@ class HomeTab extends StatelessWidget {
                         selected: i == moodIdx,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutBack,
+                          curve: Curves.easeOutCubic,
                           height: 14.0 + i * 11,
                           decoration: BoxDecoration(color: i == moodIdx ? C.ink : (i <= moodIdx ? C.lime : C.chip), borderRadius: BorderRadius.circular(8)),
                         ),

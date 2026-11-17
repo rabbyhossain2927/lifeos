@@ -43,20 +43,21 @@ class Appear extends StatefulWidget {
   final Widget child;
   final int index;
   final double dy;
-  const Appear({super.key, required this.child, this.index = 0, this.dy = 18});
+  const Appear({super.key, required this.child, this.index = 0, this.dy = 12});
   @override
   State<Appear> createState() => _AppearState();
 }
 
 class _AppearState extends State<Appear> with SingleTickerProviderStateMixin {
-  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+  late final AnimationController c = AnimationController(vsync: this, duration: const Duration(milliseconds: 380), value: Local.reduceMotion ? 1 : 0);
   late final Animation<double> a = CurvedAnimation(parent: c, curve: Curves.easeOutCubic);
   Timer? _t;
 
   @override
   void initState() {
     super.initState();
-    final delay = Duration(milliseconds: 45 * widget.index.clamp(0, 12));
+    if (Local.reduceMotion) return;
+    final delay = Duration(milliseconds: 40 * widget.index.clamp(0, 12));
     _t = Timer(delay, () {
       if (mounted) c.forward();
     });
@@ -92,7 +93,7 @@ class Press extends StatefulWidget {
   final String? label;
   final bool selected;
   final void Function()? haptic;
-  const Press({super.key, required this.child, this.onTap, this.onLongPress, this.scale = 0.95, this.label, this.selected = false, this.haptic});
+  const Press({super.key, required this.child, this.onTap, this.onLongPress, this.scale = 0.97, this.label, this.selected = false, this.haptic});
   @override
   State<Press> createState() => _PressState();
 }
@@ -128,8 +129,8 @@ class _PressState extends State<Press> {
               },
         child: AnimatedScale(
           scale: down ? widget.scale : 1,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
           child: widget.child,
         ),
       ),
@@ -158,14 +159,14 @@ class CountText extends StatelessWidget {
 class SlideRoute<T> extends PageRouteBuilder<T> {
   SlideRoute(Widget page)
       : super(
-          transitionDuration: const Duration(milliseconds: 340),
-          reverseTransitionDuration: const Duration(milliseconds: 260),
+          transitionDuration: Duration(milliseconds: Local.reduceMotion ? 0 : 320),
+          reverseTransitionDuration: Duration(milliseconds: Local.reduceMotion ? 0 : 240),
           pageBuilder: (_, __, ___) => page,
           transitionsBuilder: (_, a, __, child) {
             final c = CurvedAnimation(parent: a, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
             return FadeTransition(
               opacity: c,
-              child: SlideTransition(position: Tween(begin: const Offset(0.08, 0), end: Offset.zero).animate(c), child: child),
+              child: SlideTransition(position: Tween(begin: const Offset(0.05, 0), end: Offset.zero).animate(c), child: child),
             );
           },
         );

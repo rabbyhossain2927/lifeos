@@ -58,16 +58,59 @@ class AuthState extends ChangeNotifier {
 ThemeData _theme() => ThemeData(
       useMaterial3: true,
       fontFamily: 'Geist',
-      scaffoldBackgroundColor: const Color(0xFFF1EEF4),
-      colorScheme: ColorScheme.fromSeed(seedColor: C.ink, primary: C.ink, surface: C.white),
-      textSelectionTheme: const TextSelectionThemeData(cursorColor: C.ink, selectionColor: C.lime, selectionHandleColor: C.ink),
+      brightness: Look.dark ? Brightness.dark : Brightness.light,
+      scaffoldBackgroundColor: bgGradient.colors[1],
+      colorScheme: ColorScheme.fromSeed(seedColor: C.ink, primary: C.ink, surface: C.white, brightness: Look.dark ? Brightness.dark : Brightness.light),
+      textSelectionTheme: TextSelectionThemeData(cursorColor: C.ink, selectionColor: C.lime, selectionHandleColor: C.ink),
       splashFactory: InkSparkle.splashFactory,
     );
 
-class LifeOS extends StatelessWidget {
+class LifeOS extends StatefulWidget {
   const LifeOS({super.key});
   @override
-  Widget build(BuildContext context) {
+  State<LifeOS> createState() => _LifeOSState();
+}
+
+class _LifeOSState extends State<LifeOS> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    Look.apply(WidgetsBinding.instance.platformDispatcher.platformBrightness);
+    Look.rev.addListener(_restyle);
+  }
+
+  @override
+  void dispose() {
+    Look.rev.removeListener(_restyle);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Auto theme follows the phone's dark mode.
+  @override
+  void didChangePlatformBrightness() {
+    if (Look.mode == 'Auto') _restyle();
+  }
+
+  /// New colours or text size: rebuild every widget on screen (pages stay open).
+  void _restyle() {
+    Look.apply(WidgetsBinding.instance.platformDispatcher.platformBrightness);
+    void mark(Element e) {
+      e.markNeedsBuild();
+      e.visitChildren(mark);
+    }
+
+    if (mounted) {
+      setState(() {});
+      (context as Element).visitChildren(mark);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _app();
+
+  Widget _app() {
     return ChangeNotifierProvider(
       create: (_) => AuthState(),
       child: Consumer<AuthState>(builder: (context, auth, _) {
@@ -77,9 +120,13 @@ class LifeOS extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           navigatorKey: NotifyService.navigatorKey,
           theme: _theme(),
-          builder: (context, child) => user == null
-              ? child!
-              : ChangeNotifierProvider<Store>(key: ValueKey(user.uid), create: (_) => _makeStore(user.uid), child: child!),
+          builder: (context, child) {
+            final body = MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(Look.scale)),
+              child: child!,
+            );
+            return user == null ? body : ChangeNotifierProvider<Store>(key: ValueKey(user.uid), create: (_) => _makeStore(user.uid), child: body);
+          },
           home: !auth.ready
               ? const SplashScreen()
               : user == null

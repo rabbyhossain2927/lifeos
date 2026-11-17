@@ -13,7 +13,7 @@ Future<DateTime?> pickDate(BuildContext context, DateTime initial) {
     initialDate: initial,
     firstDate: DateTime(1940),
     lastDate: DateTime(2100),
-    builder: (c, child) => Theme(data: Theme.of(c).copyWith(colorScheme: const ColorScheme.light(primary: C.ink, onPrimary: C.lime, surface: C.white)), child: child!),
+    builder: (c, child) => Theme(data: Theme.of(c).copyWith(colorScheme: ColorScheme.light(primary: C.ink, onPrimary: C.lime, surface: C.white)), child: child!),
   );
 }
 

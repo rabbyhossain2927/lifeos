@@ -79,7 +79,7 @@ class _GoalsTabState extends State<GoalsTab> {
             child: Stack(children: [
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 320),
-                curve: Curves.easeOutBack,
+                curve: Curves.easeOutCubic,
                 left: i * (w + 4),
                 top: 0,
                 bottom: 0,
@@ -176,7 +176,7 @@ class GoalCard extends StatelessWidget {
           scale: 0.98,
           label: '${g['title']}',
           child: Col([
-            Row(children: [Tag.area('${g['area'] ?? 'Self'}'), const Spacer(), on ? const Tag('On track', bg: C.ink, fg: C.lime) : const Tag('Behind', bg: C.warnSoft, fg: C.warn)]),
+            Row(children: [Tag.area('${g['area'] ?? 'Self'}'), const Spacer(), on ? Tag('On track', bg: C.ink, fg: C.lime) : Tag('Behind', bg: C.warnSoft, fg: C.warn)]),
             Text('${g['title']}', style: t(18, w: w6, ls: -0.2)),
             Row(children: [Expanded(child: Text(levelName, style: t(13, c: C.muted))), Text(s.goalPair(g, level), style: t(13, w: w6))]),
             Bar(p, color: level == 'day' ? C.lime2 : C.ink),
@@ -245,7 +245,7 @@ class _AddGoalPageState extends State<AddGoalPage> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
-        decoration: const BoxDecoration(gradient: bgGradient),
+        decoration: bgDecoration,
         child: SafeArea(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 40),
@@ -355,7 +355,7 @@ class _ReviewPageState extends State<ReviewPage> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
-        decoration: const BoxDecoration(gradient: bgGradient),
+        decoration: bgDecoration,
         child: SafeArea(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 40),

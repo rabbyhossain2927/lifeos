@@ -66,13 +66,13 @@ void main() {
   });
 
   final screens = <String, Widget Function()>{
-    '01-home': () => Container(decoration: const BoxDecoration(gradient: bgGradient), child: HomeTab(onTab: (_) {})),
-    '02-goals': () => Container(decoration: const BoxDecoration(gradient: bgGradient), child: const GoalsTab()),
+    '01-home': () => Container(decoration: BoxDecoration(gradient: bgGradient), child: HomeTab(onTab: (_) {})),
+    '02-goals': () => Container(decoration: BoxDecoration(gradient: bgGradient), child: const GoalsTab()),
     '03-goal-detail': () => const GoalDetail(id: 'g1'),
     '04-new-goal': () => const AddGoalPage(),
     '05-review': () => const ReviewPage(),
-    '06-explore': () => Container(decoration: const BoxDecoration(gradient: bgGradient), child: const ExploreTab()),
-    '07-account': () => Container(decoration: const BoxDecoration(gradient: bgGradient), child: const AccountTab()),
+    '06-explore': () => Container(decoration: BoxDecoration(gradient: bgGradient), child: const ExploreTab()),
+    '07-account': () => Container(decoration: BoxDecoration(gradient: bgGradient), child: const AccountTab()),
     for (var i = 0; i < tools.length; i++) '${(10 + i)}-${tools[i].key}': tools[i].page,
   };
 

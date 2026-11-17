@@ -13,7 +13,7 @@ class GoalDetail extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = store(context);
     final g = s.get('goals', id);
-    if (g == null) return const ToolPage(title: 'Goal', subtitle: 'This goal was deleted.', icon: Icons.flag_outlined, colors: (C.chip, C.ink), children: []);
+    if (g == null) return ToolPage(title: 'Goal', subtitle: 'This goal was deleted.', icon: Icons.flag_outlined, colors: (C.chip, C.ink), children: []);
     final done = s.goalDoneToday(g);
     final on = s.onTrack(g);
     final behind = s.goalBehind(g);
@@ -24,7 +24,7 @@ class GoalDetail extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
-        decoration: const BoxDecoration(gradient: bgGradient),
+        decoration: bgDecoration,
         child: SafeArea(
           bottom: false,
           child: ListView(
@@ -35,13 +35,13 @@ class GoalDetail extends StatelessWidget {
                 const SizedBox(width: 10),
                 Tag.area('${g['area'] ?? 'Self'}'),
                 const SizedBox(width: 6),
-                on ? const Tag('On track', bg: C.ink, fg: C.lime) : const Tag('Behind', bg: C.warnSoft, fg: C.warn),
+                on ? Tag('On track', bg: C.ink, fg: C.lime) : Tag('Behind', bg: C.warnSoft, fg: C.warn),
                 const Spacer(),
                 Press(
                   onTap: () => _menu(context, s, g),
                   label: 'Goal options',
                   scale: 0.9,
-                  child: Container(width: 46, height: 46, decoration: const BoxDecoration(color: C.white, shape: BoxShape.circle), child: const Icon(Icons.more_horiz_rounded)),
+                  child: Container(width: 46, height: 46, decoration: BoxDecoration(color: C.white, shape: BoxShape.circle), child: const Icon(Icons.more_horiz_rounded)),
                 ),
               ]),
               Text('${g['title']}', style: t(28, w: w6, ls: -0.6, h: 1.15)),

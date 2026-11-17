@@ -1,40 +1,118 @@
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/local.dart';
 import '../services/store.dart';
 import 'motion.dart';
 
-/// Colours from the design.
-class C {
-  static const ink = Color(0xFF111111);
-  static const lime = Color(0xFFD4F06B);
-  static const lime2 = Color(0xFFC5E35A);
-  static const limeSoft = Color(0xFFEEF7C9);
-  static const limeText = Color(0xFF3A3F1C);
-  static const muted = Color(0xFF5F6368);
-  static const chip = Color(0xFFF4F2F7);
-  static const line = Color(0xFFEDEDE8);
-  static const border = Color(0xFFC9C9C2);
-  static const off = Color(0xFFE3E1E8);
-  static const dark2 = Color(0xFF222222);
-  static const dark3 = Color(0xFF2A2A2A);
-  static const darkMuted = Color(0xFFB5B5AE);
-  static const darkFaint = Color(0xFF9A9A94);
-  static const warn = Color(0xFFB4410C);
-  static const warnSoft = Color(0xFFFBEDE6);
-  static const good = Color(0xFF0B6B50);
-  static const white = Colors.white;
+/// The look: colour theme, light or dark, paper texture, text size.
+/// Saved on this phone (Local) so it shows before data loads.
+class Look {
+  static final rev = ValueNotifier<int>(0);
+  static const themes = <String, (Color, Color, Color)>{
+    // swatch, top of background, bottom of background
+    'Lavender': (Color(0xFFC7B8FF), Color(0xFFF6E8EE), Color(0xFFECE9F7)),
+    'Mint': (Color(0xFFA8E6CF), Color(0xFFEAF6EF), Color(0xFFDFF1EA)),
+    'Peach': (Color(0xFFFFC9A8), Color(0xFFFBEEE5), Color(0xFFF6E2E7)),
+    'Sky': (Color(0xFF9FD3F2), Color(0xFFE8F3FA), Color(0xFFE4E7F6)),
+    'Sand': (Color(0xFFE8D5B5), Color(0xFFF6F0E6), Color(0xFFEEE7DB)),
+    'Rose': (Color(0xFFF4B6C8), Color(0xFFFBE9EF), Color(0xFFF2E5F1)),
+    'Lime': (Color(0xFFD4F06B), Color(0xFFF3F7E3), Color(0xFFE9EFDB)),
+    'Mono': (Color(0xFFD9D9DE), Color(0xFFF5F5F7), Color(0xFFEAEAEE)),
+  };
+  static String get theme => themes.containsKey(Local.sp.getString('theme')) ? Local.sp.getString('theme')! : 'Lavender';
+  static String get mode => Local.sp.getString('mode') ?? 'Light'; // Light, Dark, Auto
+  static bool get texture => Local.sp.getBool('texture') ?? true;
+  static String get textSize => Local.sp.getString('text_size') ?? 'Normal';
+  static double get scale => switch (textSize) { 'Small' => 0.88, 'Large' => 1.04, _ => 0.94 };
+  static bool dark = false;
+
+  /// Picks the palette; call before building the app.
+  static void apply(Brightness platform) {
+    dark = mode == 'Dark' || (mode == 'Auto' && platform == Brightness.dark);
+    C.p = dark ? Pal.dark : Pal.light;
+  }
+
+  static Future<void> set(String key, Object v) async {
+    if (v is bool) {
+      await Local.sp.setBool(key, v);
+    } else {
+      await Local.sp.setString(key, '$v');
+    }
+    rev.value++;
+  }
 }
 
-const bgGradient = LinearGradient(
-  begin: Alignment(-0.18, -1),
-  end: Alignment(0.18, 1),
-  colors: [Color(0xFFF6E8EE), Color(0xFFF1EEF4), Color(0xFFECE9F7)],
-  stops: [0, 0.4, 1],
-);
+class Pal {
+  final Color ink;
+  final Color white;
+  final Color chip;
+  final Color line;
+  final Color border;
+  final Color off;
+  final Color muted;
+  final Color dark2;
+  final Color dark3;
+  final Color darkMuted;
+  final Color darkFaint;
+  final Color limeSoft;
+  final Color limeText;
+  final Color warnSoft;
+  const Pal(this.ink, this.white, this.chip, this.line, this.border, this.off, this.muted, this.dark2, this.dark3, this.darkMuted, this.darkFaint, this.limeSoft, this.limeText, this.warnSoft);
+  static const light = Pal(Color(0xFF1F1F23), Colors.white, Color(0xFFF4F2F7), Color(0xFFEFEEF2), Color(0xFFC9C9C2), Color(0xFFE3E1E8), Color(0xFF6B6B73), Color(0xFF2A2A30),
+      Color(0xFF34343A), Color(0xFFB9B9C0), Color(0xFF8E8E96), Color(0xFFEEF7C9), Color(0xFF3A3F1C), Color(0xFFFBEDE6));
+  // In dark mode the roles swap: cards go dark, "ink" (text and strong cards) goes light.
+  static const dark = Pal(Color(0xFFECECEF), Color(0xFF1E1E23), Color(0xFF2A2A31), Color(0xFF2E2E35), Color(0xFF4A4A52), Color(0xFF33333A), Color(0xFFA0A0A8), Color(0xFFDADADF),
+      Color(0xFFD3D3D9), Color(0xFF55555C), Color(0xFF6B6B73), Color(0xFF2F3A12), Color(0xFFD9EFA0), Color(0xFF3A2218));
+}
 
-TextStyle t(double size, {FontWeight w = FontWeight.w400, Color c = C.ink, double? h, double ls = 0, TextDecoration? deco}) =>
-    TextStyle(fontFamily: 'Geist', fontSize: size, fontWeight: w, color: c, height: h, letterSpacing: ls, decoration: deco, decorationColor: c);
+/// Colours from the design. Most follow the light/dark palette.
+class C {
+  static Pal p = Pal.light;
+  static Color get ink => p.ink;
+  static Color get white => p.white;
+  static Color get chip => p.chip;
+  static Color get line => p.line;
+  static Color get border => p.border;
+  static Color get off => p.off;
+  static Color get muted => p.muted;
+  static Color get dark2 => p.dark2;
+  static Color get dark3 => p.dark3;
+  static Color get darkMuted => p.darkMuted;
+  static Color get darkFaint => p.darkFaint;
+  static Color get limeSoft => p.limeSoft;
+  static Color get limeText => p.limeText;
+  static Color get warnSoft => p.warnSoft;
+  static const lime = Color(0xFFD4F06B);
+  static const lime2 = Color(0xFFC5E35A);
+  static const onLime = Color(0xFF1F1F23); // text on lime stays dark in both modes
+  static const warn = Color(0xFFB4410C);
+  static const good = Color(0xFF0B6B50);
+}
+
+LinearGradient get bgGradient {
+  final th = Look.themes[Look.theme]!;
+  return LinearGradient(
+    begin: const Alignment(-0.18, -1),
+    end: const Alignment(0.18, 1),
+    colors: Look.dark ? const [Color(0xFF1A1A1F), Color(0xFF141417), Color(0xFF111114)] : [th.$2, Color.lerp(th.$2, th.$3, 0.45)!, th.$3],
+    stops: const [0, 0.4, 1],
+  );
+}
+
+final _dots = MemoryImage(base64Decode('iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAYAAAByDd+UAAAAK0lEQVR42mNgGGmABYrpZtljKGYZlhbSPUhHwSgYBaNgFIyCUTAKRsFgBQCCIwOt/c/ojgAAAABJRU5ErkJggg=='));
+
+/// Page background: theme gradient plus the soft paper dots.
+BoxDecoration get bgDecoration => BoxDecoration(
+      gradient: bgGradient,
+      image: Look.texture
+          ? DecorationImage(image: _dots, repeat: ImageRepeat.repeat, scale: 2, opacity: Look.dark ? 0.0 : 0.06, colorFilter: null)
+          : null,
+    );
+
+TextStyle t(double size, {FontWeight w = FontWeight.w400, Color? c, double? h, double ls = 0, TextDecoration? deco}) =>
+    TextStyle(fontFamily: 'Geist', fontSize: size, fontWeight: w, color: c ?? C.ink, height: h, letterSpacing: ls, decoration: deco, decorationColor: c ?? C.ink);
 
 const w5 = FontWeight.w500;
 const w6 = FontWeight.w600;
@@ -58,7 +136,7 @@ class SubPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Container(
-        decoration: const BoxDecoration(gradient: bgGradient),
+        decoration: bgDecoration,
         child: SafeArea(
           bottom: false,
           child: Column(children: [
@@ -122,9 +200,10 @@ class Col extends StatelessWidget {
 
 class H2 extends StatelessWidget {
   final String text;
-  final Color color;
+  final Color? _color;
+  Color get color => _color ?? C.ink;
   final double size;
-  const H2(this.text, {super.key, this.color = C.ink, this.size = 16});
+  const H2(this.text, {super.key, Color? color, this.size = 16}) : _color = color;
   @override
   Widget build(BuildContext context) => Text(text, style: t(size, w: w6, c: color));
 }
@@ -135,8 +214,9 @@ class CardHead extends StatelessWidget {
   final String? action;
   final VoidCallback? onAction;
   final String? note;
-  final Color color;
-  const CardHead(this.title, {super.key, this.action, this.onAction, this.note, this.color = C.ink});
+  final Color? _color;
+  Color get color => _color ?? C.ink;
+  const CardHead(this.title, {super.key, this.action, this.onAction, this.note, Color? color}) : _color = color;
   @override
   Widget build(BuildContext context) {
     return Row(children: [
@@ -153,9 +233,12 @@ class RoundBtn extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
-  final Color bg, fg;
+  final Color? _bg;
+  Color get bg => _bg ?? C.white;
+  final Color? _fg;
+  Color get fg => _fg ?? C.ink;
   final double size;
-  const RoundBtn({super.key, required this.icon, required this.label, this.onTap, this.bg = C.white, this.fg = C.ink, this.size = 44});
+  const RoundBtn({super.key, required this.icon, required this.label, this.onTap, Color? bg, Color? fg, this.size = 44}) : _bg = bg, _fg = fg;
   @override
   Widget build(BuildContext context) {
     return Semantics(
@@ -174,11 +257,14 @@ class RoundBtn extends StatelessWidget {
 class PillButton extends StatelessWidget {
   final String text;
   final VoidCallback? onTap;
-  final Color bg, fg;
+  final Color? _bg;
+  Color get bg => _bg ?? C.lime;
+  final Color? _fg;
+  Color get fg => _fg ?? C.ink;
   final double height;
   final bool expand;
   final IconData? icon;
-  const PillButton(this.text, {super.key, this.onTap, this.bg = C.lime, this.fg = C.ink, this.height = 52, this.expand = true, this.icon});
+  const PillButton(this.text, {super.key, this.onTap, Color? bg, Color? fg, this.height = 52, this.expand = true, this.icon}) : _bg = bg, _fg = fg;
   @override
   Widget build(BuildContext context) {
     final b = Material(
@@ -205,8 +291,11 @@ class PillButton extends StatelessWidget {
 class SmallPill extends StatelessWidget {
   final String text;
   final VoidCallback? onTap;
-  final Color bg, fg;
-  const SmallPill(this.text, {super.key, this.onTap, this.bg = C.chip, this.fg = C.ink});
+  final Color? _bg;
+  Color get bg => _bg ?? C.chip;
+  final Color? _fg;
+  Color get fg => _fg ?? C.ink;
+  const SmallPill(this.text, {super.key, this.onTap, Color? bg, Color? fg}) : _bg = bg, _fg = fg;
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -244,7 +333,7 @@ class Toggle extends StatelessWidget {
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutBack,
+          curve: Curves.easeOutCubic,
           width: 52,
           height: 32,
           padding: const EdgeInsets.all(3),
@@ -284,7 +373,7 @@ class Tick extends StatelessWidget {
           child: Center(
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutBack,
+              curve: Curves.easeOutCubic,
               width: size,
               height: size,
               decoration: BoxDecoration(
@@ -296,7 +385,7 @@ class Tick extends StatelessWidget {
               child: AnimatedScale(
                 scale: done ? 1 : 0,
                 duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOutBack,
+                curve: Curves.easeOutCubic,
                 child: Icon(Icons.check_rounded, size: size * 0.62, color: C.ink),
               ),
             ),
@@ -315,8 +404,11 @@ Text doneText(String s, bool done, {double size = 15, bool dark = false}) => Tex
 class Bar extends StatelessWidget {
   final double value;
   final double height;
-  final Color color, track;
-  const Bar(this.value, {super.key, this.height = 8, this.color = C.ink, this.track = C.chip});
+  final Color? _color;
+  Color get color => _color ?? C.ink;
+  final Color? _track;
+  Color get track => _track ?? C.chip;
+  const Bar(this.value, {super.key, this.height = 8, Color? color, Color? track}) : _color = color, _track = track;
   @override
   Widget build(BuildContext context) {
     final v = value.isNaN ? 0.0 : value.clamp(0.0, 1.0);
@@ -341,9 +433,12 @@ class Bar extends StatelessWidget {
 class Ring extends StatelessWidget {
   final double value;
   final double size, stroke;
-  final Color color, track;
+  final Color? _color;
+  Color get color => _color ?? C.lime;
+  final Color? _track;
+  Color get track => _track ?? C.dark3;
   final Widget? center;
-  const Ring({super.key, required this.value, this.size = 104, this.stroke = 12, this.color = C.lime, this.track = C.dark3, this.center});
+  const Ring({super.key, required this.value, this.size = 104, this.stroke = 12, Color? color, Color? track, this.center}) : _color = color, _track = track;
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -362,7 +457,8 @@ class Ring extends StatelessWidget {
 
 class _RingPainter extends CustomPainter {
   final double v, stroke;
-  final Color color, track;
+  final Color color;
+  final Color track;
   _RingPainter(this.v, this.stroke, this.color, this.track);
   @override
   void paint(Canvas canvas, Size size) {
@@ -427,7 +523,7 @@ class ListRow extends StatelessWidget {
       child: Container(
         constraints: BoxConstraints(minHeight: minHeight),
         padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(border: divider ? const Border(bottom: BorderSide(color: C.line)) : null),
+        decoration: BoxDecoration(border: divider ? Border(bottom: BorderSide(color: C.line)) : null),
         child: Row(children: [
           if (leading != null) ...[leading!, const SizedBox(width: 12)],
           Expanded(
@@ -478,8 +574,9 @@ class ChoiceRow extends StatelessWidget {
   final ValueChanged<String> onPick;
   final bool dark; // selected = black instead of lime
   final double height;
-  final Color unselected;
-  const ChoiceRow({super.key, required this.options, required this.selected, required this.onPick, this.dark = false, this.height = 44, this.unselected = C.chip});
+  final Color? _unselected;
+  Color get unselected => _unselected ?? C.chip;
+  const ChoiceRow({super.key, required this.options, required this.selected, required this.onPick, this.dark = false, this.height = 44, Color? unselected}) : _unselected = unselected;
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -555,12 +652,15 @@ class Segmented extends StatelessWidget {
 class Bars extends StatelessWidget {
   final List<double> values; // 0..1, negative = empty slot
   final double height;
-  final Color color;
-  final Color empty;
+  final Color? _color;
+  Color get color => _color ?? C.lime;
+  final Color? _empty;
+  Color get empty => _empty ?? C.dark3;
   final List<String>? labels;
-  final Color labelColor;
+  final Color? _labelColor;
+  Color get labelColor => _labelColor ?? C.darkMuted;
   final double radius;
-  const Bars({super.key, required this.values, this.height = 64, this.color = C.lime, this.empty = C.dark3, this.labels, this.labelColor = C.darkMuted, this.radius = 8});
+  const Bars({super.key, required this.values, this.height = 64, Color? color, Color? empty, this.labels, Color? labelColor, this.radius = 8}) : _color = color, _empty = empty, _labelColor = labelColor;
   @override
   Widget build(BuildContext context) {
     return Column(children: [
@@ -588,10 +688,12 @@ class Bars extends StatelessWidget {
 
 const weekLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-/// Monday of this week.
+/// First day of this week (Saturday by default; Preferences can change it).
 DateTime get weekStart {
   final n = DateTime.now();
-  return DateTime(n.year, n.month, n.day).subtract(Duration(days: n.weekday - 1));
+  final first = Local.weekStartDay; // DateTime.saturday / sunday / monday
+  final back = (n.weekday - first + 7) % 7;
+  return DateTime(n.year, n.month, n.day).subtract(Duration(days: back));
 }
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -601,11 +703,12 @@ const weekdaysLong = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'S
 String niceDate(DateTime d) => '${weekdaysLong[d.weekday - 1]}, ${d.day} ${monthsLong[d.month - 1]}';
 String shortDate(DateTime d) => '${d.day} ${months[d.month - 1]}';
 String hm(DateTime d) {
+  if (Local.time24) return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
   return '$h:${d.minute.toString().padLeft(2, '0')}';
 }
 
-String hmA(DateTime d) => '${hm(d)} ${d.hour < 12 ? 'AM' : 'PM'}';
+String hmA(DateTime d) => Local.time24 ? hm(d) : '${hm(d)} ${d.hour < 12 ? 'AM' : 'PM'}';
 
 String numText(num v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
 
