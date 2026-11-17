@@ -280,7 +280,7 @@ class HabitWeek extends StatelessWidget {
   }
 }
 
-/// One habit row with streak, week boxes, ⋯ menu and swipe to delete.
+/// One habit row with streak, week boxes, ••• menu and swipe to delete.
 Row2 habitRow(BuildContext context, Store s, Json h) => Row2(
       swipeId: 'habit-${h['id']}',
       title: '${h['name']}',
@@ -454,14 +454,12 @@ class WaterPage extends StatelessWidget {
       Panel(
         title: 'Add custom amount',
         child: Chips(
-          options: const ['+100 ml', '+200 ml', '+330 ml', '+500 ml', 'Other…', '− Undo 250'],
+          options: const ['100 ml', '200 ml', '330 ml', '500 ml', 'Other…'],
           add: true,
           onTap: (v) async {
             if (v == 'Other…') {
               final n = await askNumber(context, 'How much did you drink? (ml)', '250');
               if (n != null) s.setWaterMl(ml + n.round());
-            } else if (v.startsWith('−')) {
-              s.setWaterMl(ml - 250);
             } else {
               s.setWaterMl(ml + int.parse(v.replaceAll(RegExp(r'[^0-9]'), '')));
             }

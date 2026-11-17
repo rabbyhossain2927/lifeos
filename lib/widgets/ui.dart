@@ -85,6 +85,8 @@ class C {
   static Color get limeText => p.limeText;
   static Color get warnSoft => p.warnSoft;
   static const lime = Color(0xFFD4F06B);
+  /// Lime text on an "ink" card (that card turns light in dark mode).
+  static Color get accentOnInk => Look.dark ? const Color(0xFF5A6B12) : lime;
   static const lime2 = Color(0xFFC5E35A);
   static const onLime = Color(0xFF1F1F23); // text on lime stays dark in both modes
   static const warn = Color(0xFFB4410C);

@@ -115,7 +115,7 @@ class HomeTab extends StatelessWidget {
                   child: Ring(value: total == 0 ? 0 : done / total, size: 100, stroke: 12, center: CountText(total == 0 ? 0 : (done * 100 / total).round(), style: t(22, w: w6, c: C.white), format: (v) => '${v.round()}%')),
                 ),
                 Text('$done of $total done', style: t(15, w: w6, c: C.white)),
-                Text('${s.dayStreak}-day streak · ${s.points} pts', style: t(12, c: C.lime)),
+                Text('${s.dayStreak}-day streak · ${s.points} pts', style: t(12, c: C.accentOnInk)),
               ]),
               bg: C.ink,
               r: 26,
@@ -128,7 +128,7 @@ class HomeTab extends StatelessWidget {
               Expanded(
                 child: tile(
                   Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Row(children: [Expanded(child: Text('Prayers', style: t(13, w: w6))), CountText(prayed.length, style: t(18, w: w6), format: (v) => '${v.round()}/5')]),
+                    Row(children: [Expanded(child: Text('Prayers', style: t(13, w: w6, c: C.onLime))), CountText(prayed.length, style: t(18, w: w6, c: C.onLime), format: (v) => '${v.round()}/5')]),
                     const SizedBox(height: 10),
                     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                       for (final n in times.keys)
@@ -138,8 +138,8 @@ class HomeTab extends StatelessWidget {
                           width: 26,
                           height: 26,
                           alignment: Alignment.center,
-                          decoration: BoxDecoration(color: prayed.contains(n) ? C.ink : const Color(0x26111111), shape: BoxShape.circle),
-                          child: Text(n[0], style: t(10, w: FontWeight.w700, c: prayed.contains(n) ? C.lime : C.ink)),
+                          decoration: BoxDecoration(color: prayed.contains(n) ? C.onLime : const Color(0x26111111), shape: BoxShape.circle),
+                          child: Text(n[0], style: t(10, w: FontWeight.w700, c: prayed.contains(n) ? C.lime : C.onLime)),
                         ),
                     ]),
                   ]),
@@ -347,7 +347,7 @@ class HomeTab extends StatelessWidget {
                     AnimatedOpacity(
                       duration: const Duration(milliseconds: 200),
                       opacity: prayed.contains(e.key) ? 1 : 0,
-                      child: Icon(Icons.check_rounded, size: 13, color: C.lime),
+                      child: Icon(Icons.check_rounded, size: 13, color: C.accentOnInk),
                     ),
                   ]),
                 ),

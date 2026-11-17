@@ -638,7 +638,7 @@ Future<num?> askNumber(BuildContext context, String title, [String initial = '']
   return out;
 }
 
-/// One line of the ⋯ menu.
+/// One line of the ••• menu.
 class MenuItem {
   final String label;
   final IconData icon;
@@ -672,7 +672,7 @@ void showMenuSheet(BuildContext context, String title, List<MenuItem> items) {
       ], space: 8));
 }
 
-/// The ⋯ button on a row.
+/// The ••• button on a row.
 class DotsBtn extends StatelessWidget {
   final VoidCallback onTap;
   final String label;

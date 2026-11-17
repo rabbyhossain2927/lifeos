@@ -87,7 +87,7 @@ extension GoalMath on Store {
   String paceText(Json g) {
     final b = goalBehind(g);
     if (b.abs() < goalTarget(g) * 0.01) return 'Right on plan';
-    return b > 0 ? '${amountText(g, b, small: b * ((g['perUnit'] ?? 1) as num) < 1000)} behind plan' : '${amountText(g, -b, small: -b * ((g['perUnit'] ?? 1) as num) < 1000)} ahead of plan';
+    return b > 0 ? '${amountText(g, b, small: b < 1)} behind plan' : '${amountText(g, -b, small: -b < 1)} ahead of plan';
   }
 
   // ---- day-by-day small steps
@@ -219,7 +219,7 @@ class _GoalsTabState extends State<GoalsTab> {
                 const SizedBox(height: 10),
                 Ring(value: pct, size: 96, stroke: 11, center: CountText(pct * 100, style: t(21, w: w6, c: C.white), format: (v) => '${v.round()}%')),
                 const SizedBox(height: 10),
-                Text('All goals together', style: t(12, c: C.lime)),
+                Text('All goals together', style: t(12, c: C.accentOnInk)),
               ]),
             ),
           ),
@@ -254,9 +254,9 @@ class _GoalsTabState extends State<GoalsTab> {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(22)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text(k, style: t(12, w: bg == C.lime ? w6 : FontWeight.w400, c: bg == C.lime ? C.ink : C.muted)),
+          Text(k, style: t(12, w: bg == C.lime ? w6 : FontWeight.w400, c: bg == C.lime ? C.onLime : C.muted)),
           const SizedBox(height: 4),
-          AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: Text(v, key: ValueKey(v), style: t(22, w: w6))),
+          AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: Text(v, key: ValueKey(v), style: t(22, w: w6, c: bg == C.lime ? C.onLime : C.ink))),
         ]),
       );
 }
@@ -683,7 +683,7 @@ class _ReviewPageState extends State<ReviewPage> {
                     Builder(builder: (_) {
                       final p = (s.goalProgress(g)['week']! / s.goalTargets(g)['week']!).clamp(0.0, 1.0);
                       return Col([
-                        Row(children: [Expanded(child: Text('${g['title']}', style: t(13, c: C.white))), Text('${(p * 100).round()}%', style: t(13, w: w6, c: C.lime))]),
+                        Row(children: [Expanded(child: Text('${g['title']}', style: t(13, c: C.white))), Text('${(p * 100).round()}%', style: t(13, w: w6, c: C.accentOnInk))]),
                         Bar(p, height: 6, color: C.lime, track: C.dark3),
                       ], space: 6);
                     }),

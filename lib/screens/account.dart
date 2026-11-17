@@ -116,7 +116,7 @@ class _AccountTabState extends State<AccountTab> {
                   child: Col([
                     Row(children: [
                       Expanded(child: Text('Level ${s.lvl} · ${s.lvlName}', style: t(13, w: w6, c: C.white))),
-                      CountText(s.xpInLevel, style: t(13, w: w6, c: Look.dark ? C.limeText : C.lime), format: (v) => '${v.round()} / 1000 XP'),
+                      CountText(s.xpInLevel, style: t(13, w: w6, c: C.accentOnInk), format: (v) => '${v.round()} / 1000 XP'),
                     ]),
                     Bar(s.xpInLevel / 1000, color: C.lime, track: C.dark3),
                     Row(children: [
@@ -318,7 +318,7 @@ class XpPage extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(k, style: t(11, c: dark ? C.darkMuted : C.muted)),
           Text(v, style: t(20, w: w6, c: dark ? C.white : C.ink)),
-          Text(sub, style: t(11, c: dark ? (Look.dark ? C.limeText : C.lime) : C.muted)),
+          Text(sub, style: t(11, c: dark ? C.accentOnInk : C.muted)),
         ]),
       );
 }
@@ -767,22 +767,22 @@ class _HowToPageState extends State<HowToPage> {
       ("Tap, don't type", 'Most things are one tap: tick a habit, fill a glass, pick a mood, tap a food.'),
       ('Use the lime + button', 'It adds a goal, habit, meal, glass of water, journal line, reminder, date or memory.'),
       ('Pin your tools', 'Explore → Edit Home → star the tools you use most. They show on Home.'),
-      ('Swipe and ⋯', 'Swipe a row to the left to delete it (Undo shows). Tap ⋯ to edit. Hold a chip to rename it.'),
+      ('Swipe and •••', 'Swipe a row to the left to delete it (Undo shows). Tap ••• to edit. Hold a chip to rename it.'),
     ],
     'Goals': [
       ('Tap + on the Goals tab', 'Pick a start like Read books, or Custom and choose your own icon.'),
       ('Say how much and how often', 'Daily, weekly, half monthly, monthly, quarterly, half yearly, yearly or every N days. Pick the unit: pages, tk, steps, \$ or your own.'),
       ('Take a suggestion', 'Type a name and LifeOS suggests a full goal. It also shows the split per year, month, week and day.'),
-      ('Pick a small steps plan', 'Weekly gives 7 dated steps, monthly gives a step for every day of the month. Change any day with ⋯, skip a day with a swipe.'),
+      ('Pick a small steps plan', 'Weekly gives 7 dated steps, monthly gives a step for every day of the month. Change any day with •••, skip a day with a swipe.'),
       ('Tick or log', 'Tick a step, or use Custom log for any amount on any day. Every bar moves.'),
-      ('Fix a mistake', 'Open Log history, tap ⋯, then Edit amount or Delete.'),
+      ('Fix a mistake', 'Open Log history, tap •••, then Edit amount or Delete.'),
       ('Ahead or behind', 'It compares what you did with the plan up to today. Behind is a nudge, not a fail.'),
       ('Review on Friday', 'Goals → Review: how it went, what helped, next week\'s focus.'),
     ],
     'Daily': [
       ('Prayer', 'Tick each prayer when you pray (+10 XP). Prayer alerts come 10 minutes before.'),
       ('Dhikr', 'Explore → Dhikr. Tap the big circle to count. Add your own dhikr or dua with its target.'),
-      ('Habits', 'Tap a box in the week row to count that day. ⋯ edits the name and colour.'),
+      ('Habits', 'Tap a box in the week row to count that day. ••• edits the name and colour.'),
       ('Water and food', 'Tap glasses or add a custom ml amount. Food icons match the name; edit quick add to remove items.'),
       ('Sleep and mood', 'Pick the hours you slept and see what it means. Pick a mood and what is behind it; add your own.'),
     ],

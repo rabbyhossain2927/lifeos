@@ -167,7 +167,7 @@ class GoalDetail extends StatelessWidget {
                 ),
               RowsPanel(
                 title: 'Log history',
-                hint: 'tap ⋯ to edit',
+                hint: 'tap ••• to edit',
                 empty: 'Nothing logged yet.',
                 rows: [
                   for (final e in logs.take(30))
