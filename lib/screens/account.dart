@@ -495,7 +495,7 @@ class _BackupPageState extends State<BackupPage> {
     final s = store(context);
     final synced = s.lastSyncedAt;
     final count = Store.collections.fold<int>(0, (a, c) => a + s.list(c).length);
-    Widget place(String title, String sub, IconData icon, (Color, Color) c, String btn, String key, Future<String?> Function() f) => Row2(
+    Row2 place(String title, String sub, IconData icon, (Color, Color) c, String btn, String key, Future<String?> Function() f) => Row2(
           title: title,
           sub: sub,
           leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: c.$1, borderRadius: BorderRadius.circular(13)), child: Icon(icon, size: 19, color: c.$2)),
