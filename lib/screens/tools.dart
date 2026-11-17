@@ -71,8 +71,9 @@ final tools = <Tool>[
     final n = s.nextPrayer;
     return 'Next: ${n.key} ${hmA(n.value)}';
   }, () => const PrayerPage()),
+  Tool('dhikr', 'Dhikr', 'Daily', 'Tap the big circle to count', Icons.touch_app_outlined, (s) => '${s.dhikrTotal()} today', () => const DhikrPage()),
   Tool('habits', 'Habits', 'Daily', 'Small things, every day', Icons.check_rounded, (s) => '${s.habitsDoneToday} of ${s.list('habits').length} done', () => const HabitsPage()),
-  Tool('water', 'Water', 'Daily', 'Sip through the day', Icons.water_drop_outlined, (s) => '${s.waterOn()} of ${s.waterGoal} glasses', () => const WaterPage()),
+  Tool('water', 'Water', 'Daily', 'Sip through the day', Icons.water_drop_outlined, (s) => '${s.waterMlOn()} of ${s.waterGoalMl} ml', () => const WaterPage()),
   Tool('food', 'Food', 'Daily', 'Tap what you ate', Icons.restaurant_outlined, (s) => '${s.kcalOn(todayKey)} kcal today', () => const FoodPage()),
   Tool('sleep', 'Sleep', 'Daily', 'Rest well, wake for Fajr', Icons.bedtime_outlined, (s) {
     final h = s.sleepOn(todayKey);
@@ -88,7 +89,7 @@ final tools = <Tool>[
   Tool('focus', 'Focus', 'Grow', 'One thing at a time', Icons.timer_outlined, (s) => '${s.focusOn(todayKey)} min today', () => const FocusPage()),
   Tool('learn', 'Learn', 'Grow', 'A little every day', Icons.school_outlined, (s) {
     final n = s.list('courses').length + s.list('books').where((b) => b['done'] != true).length;
-    return n == 0 ? 'Start something' : _plural(n, 'thing') + ' going';
+    return n == 0 ? 'Start something' : '${_plural(n, 'thing')} going';
   }, () => const LearnPage()),
   Tool('rewards', 'Rewards', 'Grow', 'You earned these', Icons.emoji_events_outlined, (s) => '${s.points} points', () => const RewardsPage(), pro: 'rewards'),
   Tool('dates', 'Dates', 'Life', 'Birthdays and big days', Icons.event_outlined, (s) {
@@ -101,9 +102,8 @@ final tools = <Tool>[
     return tr == null ? 'Plan a trip' : '${tr['place']}${d == null ? '' : ' · ${shortDate(d)}'}';
   }, () => const TravelPage(), pro: 'travel'),
   Tool('selfcare', 'Self care', 'Life', 'Look after you', Icons.favorite_border_rounded, (s) {
-    final pm = DateTime.now().hour >= 15;
-    final l = s.list('care').where((c) => c['time'] == (pm ? 'pm' : 'am')).toList();
-    return '${l.where((c) => (c['logs'] as Map? ?? {})[todayKey] == true).length} of ${l.length} ${pm ? 'tonight' : 'this morning'}';
+    final l = s.list('care').where((c) => careDue(c, DateTime.now())).toList();
+    return l.isEmpty ? 'Plan your care' : '${l.where((c) => (c['logs'] as Map? ?? {})[todayKey] == true).length} of ${l.length} today';
   }, () => const SelfCarePage()),
   Tool('memory', 'Memory', 'Life', 'Keep the good days', Icons.auto_awesome_outlined, (s) => _plural(s.list('moments').length, 'memory').replaceAll('memorys', 'memories'), () => const MemoryPage(), pro: 'memory'),
 ];

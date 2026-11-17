@@ -93,7 +93,7 @@ class GoalDetail extends StatelessWidget {
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         Icon(ahead ? Icons.check_rounded : Icons.trending_down_rounded, size: 14, color: ahead ? C.lime : const Color(0xFFF2A07B)),
                         const SizedBox(width: 6),
-                        Text(s.paceText(g), style: t(12, w: w6, c: ahead ? C.lime : const Color(0xFFF2A07B))),
+                        Flexible(child: Text(s.paceText(g), overflow: TextOverflow.ellipsis, style: t(12, w: w6, c: ahead ? C.lime : const Color(0xFFF2A07B)))),
                         const SizedBox(width: 6),
                         const Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFFB9B9C0)),
                       ]),

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/life.dart';
@@ -28,13 +29,27 @@ class JournalPage extends StatefulWidget {
 class _JournalPageState extends State<JournalPage> {
   late final text = TextEditingController(text: '${store(context, listen: false).day()['text'] ?? ''}');
 
+  void _edit(Store s, Json d) {
+    final c = TextEditingController(text: '${d['text'] ?? ''}');
+    var type = '${d['dayType'] ?? ''}';
+    showSheet(context, niceDate(parseDay('${d['id']}')), (ctx, set) => Col([
+          Chips(options: const ['Positive', 'Neutral', 'Negative'], selected: {type}, onTap: (v) => set(() => type = type == v ? '' : v)),
+          SoftField(controller: c, hint: 'What happened?', lines: 5),
+          PressPill('Save', success: true, onTap: () {
+            s.patchDay({'text': c.text.trim(), 'dayType': type.isEmpty ? null : type}, '${d['id']}');
+            if (d['id'] == todayKey) text.text = c.text.trim();
+            Navigator.pop(ctx);
+          }),
+        ], space: 12));
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = store(context);
     final streak = journalStreak(s);
+    final type = '${s.day()['dayType'] ?? ''}';
     final grat = ((s.day()['grateful'] as List?) ?? const []).map((e) => '$e').toSet();
-    final past = s.list('days').where((d) => d['id'] != todayKey && '${d['text'] ?? ''}'.trim().isNotEmpty).toList()
-      ..sort((a, b) => '${b['id']}'.compareTo('${a['id']}'));
+    final entries = s.list('days').where((d) => '${d['text'] ?? ''}'.trim().isNotEmpty).toList()..sort((a, b) => '${b['id']}'.compareTo('${a['id']}'));
     final doy = DateTime.now().difference(DateTime(DateTime.now().year)).inDays;
     return ToolFrame('journal', children: [
       HeroCard(
@@ -42,6 +57,11 @@ class _JournalPageState extends State<JournalPage> {
         big: '$streak day${streak == 1 ? '' : 's'}',
         sub: 'Just 3 lines a day',
         dots: [for (var i = 0; i < 7; i++) ('${s.day(s.last7[i])['text'] ?? ''}'.trim().isNotEmpty, s.last7Letters[i])],
+      ),
+      Panel(
+        title: 'How was the day?',
+        hint: 'tap again to clear',
+        child: Chips(options: const ['Positive', 'Neutral', 'Negative'], selected: {type}, onTap: (v) => s.patchDay({'dayType': type == v ? null : v})),
       ),
       NoteCard("Today's prompt", prompts[doy % prompts.length]),
       Panel(
@@ -64,12 +84,22 @@ class _JournalPageState extends State<JournalPage> {
         FocusScope.of(context).unfocus();
         toast(context, first ? 'Saved. ${streak + 1} day streak!' : 'Saved.');
       }),
-      RowsPanel(title: 'Past entries', empty: 'Your entries show here.', rows: [
-        for (final d in past.take(10))
+      RowsPanel(title: 'Daily journal', hint: 'tap to edit · swipe ← to delete', empty: 'Your entries show here.', rows: [
+        for (final d in entries.take(40))
           Row2(
+            swipeId: 'journal-${d['id']}',
             title: '${d['text']}'.split('\n').first,
-            sub: '${shortDate(parseDay('${d['id']}'))}${(d['grateful'] as List?)?.isNotEmpty == true ? ' · ${(d['grateful'] as List).first}' : ''}',
-            onTap: () => showSheet(context, shortDate(parseDay('${d['id']}')), (_, __) => Text('${d['text']}', style: t(15, h: 1.5))),
+            sub: [d['id'] == todayKey ? 'Today' : shortDate(parseDay('${d['id']}')), if (d['dayType'] != null) '${d['dayType']}', if ((d['grateful'] as List?)?.isNotEmpty == true) '${(d['grateful'] as List).first}'].join(' · '),
+            onTap: () => _edit(s, d),
+            onDots: () => showMenuSheet(context, shortDate(parseDay('${d['id']}')), [
+              MenuItem('Edit', Icons.edit_outlined, () => _edit(s, d)),
+              MenuItem('Delete', Icons.delete_outline_rounded, () => s.patchDay({'text': null}, '${d['id']}'), danger: true),
+            ]),
+            onDelete: () {
+              s.patchDay({'text': null}, '${d['id']}');
+              if (d['id'] == todayKey) text.clear();
+            },
+            onUndo: () => s.patchDay({'text': d['text']}, '${d['id']}'),
           ),
       ]),
     ]);
@@ -149,16 +179,35 @@ class _FocusPageState extends State<FocusPage> {
     setState(() {});
   }
 
+  String mins(int m) => m >= 60 ? '${m ~/ 60}h ${(m % 60).toString().padLeft(2, '0')}m' : '${m}m';
+
+  Widget _tile(String k, String v, Color bg) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(k, style: t(11, c: bg == C.lime ? C.onLime : C.muted)),
+          const SizedBox(height: 2),
+          Text(v, style: t(17, w: w6, c: bg == C.lime ? C.onLime : C.ink)),
+        ]),
+      );
+
   @override
   Widget build(BuildContext context) {
     final s = store(context);
     final l = left;
-    final todays = s.list('focus').where((f) => f['day'] == todayKey).toList();
+    final all = s.list('focus');
+    final totalAll = all.fold<int>(0, (a, f) => a + ((f['mins'] ?? 0) as num).toInt());
+    final week = all.where((f) => '${f['day']}'.compareTo(dayKey(weekStart)) >= 0).fold<int>(0, (a, f) => a + ((f['mins'] ?? 0) as num).toInt());
+    final byDay = <String, List<Json>>{};
+    for (final f in all) {
+      byDay.putIfAbsent('${f['day']}', () => []).add(f);
+    }
+    final days = byDay.keys.toList()..sort((a, b) => b.compareTo(a));
     return ToolFrame('focus', children: [
       HeroCard(
         label: FocusTimer.label,
         big: running ? 'Stay with it' : (FocusTimer.pausedLeft != null ? 'Paused' : 'Ready?'),
-        sub: '${s.focusOn(todayKey)} min focused today',
+        sub: 'Today ${mins(s.focusOn(todayKey))} · Total ${mins(totalAll)}',
         ring: 1 - l / (FocusTimer.mins * 60),
         ringText: '${(l ~/ 60).toString().padLeft(2, '0')}:${(l % 60).toString().padLeft(2, '0')}',
         btns: [HeroBtn(running ? 'Pause' : 'Start', startPause, primary: true), HeroBtn('Reset', () => reset())],
@@ -169,98 +218,202 @@ class _FocusPageState extends State<FocusPage> {
         child: Chips(options: const ['15 min', '25 min', '45 min', '60 min'], selected: {'${FocusTimer.mins} min'}, onTap: (v) => reset(int.parse(v.split(' ').first))),
       ),
       Panel(title: 'What for', child: Chips(options: const ['Work', 'Study', 'Quran', 'Reading'], selected: {FocusTimer.label}, onTap: (v) => setState(() => FocusTimer.label = v))),
-      RowsPanel(title: 'Today', empty: 'No session yet. Press Start.', rows: [
-        for (final f in todays.reversed)
-          Row2(title: '${f['label'] ?? 'Focus'}'.isEmpty ? 'Focus' : '${f['label']}', sub: hmA(DateTime.fromMillisecondsSinceEpoch(((f['createdAt'] ?? 0) as num).toInt())), right: '${f['mins']} min'),
+      Row(children: gap([
+        Expanded(child: _tile('Today', mins(s.focusOn(todayKey)), C.white)),
+        Expanded(child: _tile('This week', mins(week), C.white)),
+        Expanded(child: _tile('All time', mins(totalAll), C.lime)),
+      ], 8)),
+      RowsPanel(title: 'Daily focus', hint: 'swipe ← to delete a day', empty: 'No session yet. Press Start.', rows: [
+        for (final k in days.take(30))
+          Row2(
+            swipeId: 'focus-$k',
+            title: k == todayKey ? 'Today' : niceDate(parseDay(k)),
+            sub: () {
+              final m = <String, int>{};
+              for (final f in byDay[k]!) {
+                final l = '${f['label'] ?? ''}'.isEmpty ? 'Focus' : '${f['label']}';
+                m[l] = (m[l] ?? 0) + ((f['mins'] ?? 0) as num).toInt();
+              }
+              return m.entries.map((e) => '${e.key} ${mins(e.value)}').join(' · ');
+            }(),
+            right: mins(byDay[k]!.fold<int>(0, (a, f) => a + ((f['mins'] ?? 0) as num).toInt())),
+            onDots: () => showMenuSheet(context, k == todayKey ? 'Today' : niceDate(parseDay(k)), [
+              MenuItem('Add minutes by hand', Icons.add_rounded, () async {
+                final v = await askNumber(context, 'Minutes', '25');
+                if (v != null && v > 0) s.add('focus', {'day': k, 'mins': v.round(), 'label': FocusTimer.label});
+              }),
+              MenuItem('Delete this day', Icons.delete_outline_rounded, () {
+                for (final f in byDay[k]!) {
+                  s.remove('focus', f['id'] as String);
+                }
+              }, danger: true),
+            ]),
+            onDelete: () {
+              for (final f in byDay[k]!) {
+                s.remove('focus', f['id'] as String);
+              }
+            },
+            onUndo: () {
+              for (final f in byDay[k]!) {
+                s.save('focus', f);
+              }
+            },
+          ),
       ]),
     ]);
   }
 }
 
 // ------------------------------------------------------------------ Learn
+/// kind: (icon, default unit)
+const learnKinds = <String, (IconData, String)>{
+  'Book': (Icons.menu_book_rounded, 'pages'),
+  'Course': (Icons.cast_for_education_outlined, 'lessons'),
+  'YouTube': (Icons.smart_display_outlined, 'videos'),
+  'Podcast': (Icons.podcasts_rounded, 'episodes'),
+  'Quran': (Icons.auto_stories_outlined, 'pages'),
+  'Skill': (Icons.code_rounded, 'hours'),
+  'Article': (Icons.article_outlined, 'articles'),
+  'Other': (Icons.lightbulb_outline_rounded, 'parts'),
+};
+
 class LearnPage extends StatelessWidget {
   const LearnPage({super.key});
+
+  /// Books used their own collection before; everything new lives in courses.
+  static List<(String col, Json item)> items(Store s) => [
+        for (final c in s.list('courses')) ('courses', c),
+        for (final b in s.list('books').where((b) => b['done'] != true)) ('books', b),
+      ];
+
+  static String unitOf(String col, Json x) => col == 'books' ? 'pages' : '${x['unit'] ?? learnKinds['${x['kind']}']?.$2 ?? 'lessons'}';
+  static int doneOf(String col, Json x) => (((col == 'books' ? x['page'] : x['done']) ?? 0) as num).toInt();
+  static int totalOf(String col, Json x) => (((col == 'books' ? x['pages'] : x['total']) ?? 1) as num).toInt();
+
   @override
   Widget build(BuildContext context) {
     final s = store(context);
-    final courses = s.list('courses');
-    final books = s.list('books').where((b) => b['done'] != true).toList();
-    int lessonsOn(String k) => courses.fold(0, (a, c) => a + (((c['logs'] as Map? ?? {})[k] ?? 0) as num).toInt());
-    final week = [for (final k in s.last7) lessonsOn(k).toDouble()];
+    final list = items(s);
+    int doneOn(String k) => s.list('courses').fold(0, (a, c) => a + (((c['logs'] as Map? ?? {})[k] ?? 0) as num).toInt());
+    final week = [for (final k in s.last7) doneOn(k).toDouble()];
     return ToolFrame('learn', children: [
       HeroCard(
         label: 'This week',
-        big: '${week.reduce((a, b) => a + b).round()} lessons',
-        sub: '${courses.length} course${courses.length == 1 ? '' : 's'} · ${books.length} book${books.length == 1 ? '' : 's'} going',
+        big: '${week.reduce((a, b) => a + b).round()} done',
+        sub: '${list.length} thing${list.length == 1 ? '' : 's'} going · log pages, lessons or videos',
         bars: [for (var i = 0; i < 7; i++) (week[i], s.last7Letters[i])],
       ),
-      RowsPanel(title: 'My learning', hint: 'tick = 1 done', empty: 'Nothing yet. Start something below.', rows: [
-        for (final c in courses)
-          (() {
-            final logs = Map<String, dynamic>.from(c['logs'] as Map? ?? {});
-            final today = logs[todayKey] != null;
-            final done = ((c['done'] ?? 0) as num).toInt(), total = ((c['total'] ?? 1) as num).toInt();
-            return Row2(
-              title: '${c['name']}',
-              sub: 'Lesson $done of $total${today ? ' · done today' : ''}',
-              done: today,
-              progress: done / (total == 0 ? 1 : total),
-              onTick: () {
-                if (today) {
-                  logs.remove(todayKey);
-                } else {
-                  logs[todayKey] = 1;
-                }
-                s.patch('courses', c['id'] as String, {'logs': logs, 'done': (done + (today ? -1 : 1)).clamp(0, total)});
-              },
-              onLongPress: () async {
-                if (await confirm(context, 'Delete ${c['name']}?')) s.remove('courses', c['id'] as String);
-              },
-            );
-          })(),
-        for (final b in books)
-          (() {
-            final page = ((b['page'] ?? 0) as num).toInt(), pages = ((b['pages'] ?? 300) as num).toInt();
-            return Row2(
-              title: '${b['title']}',
-              sub: 'Page $page of $pages · tap to update',
-              progress: page / (pages == 0 ? 1 : pages),
-              onTap: () {
-                var p = page;
-                showSheet(context, '${b['title']}', (ctx, set) => Col([
-                      Stepper2(value: '$p', unit: 'of $pages pages', onMinus: () => set(() => p = (p - 10).clamp(0, pages)), onPlus: () => set(() => p = (p + 10).clamp(0, pages))),
-                      PressPill(p >= pages ? 'Finished it!' : 'Save', success: true, onTap: () {
-                        s.patch('books', b['id'] as String, {'page': p, 'done': p >= pages, if (p >= pages) 'finishedAt': DateTime.now().millisecondsSinceEpoch});
-                        if (p >= pages) Haptic.celebrate();
-                        Navigator.pop(ctx);
-                      }),
-                    ], space: 12));
-              },
-            );
-          })(),
-      ]),
       Panel(
-        title: 'Start something new',
-        child: Chips(options: const ['Language', 'Quran', 'A skill', 'A book'], add: true, onTap: (k) => _add(context, s, k)),
+        title: 'Add something',
+        child: GridView.count(
+          crossAxisCount: 4,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: 0.95,
+          children: [
+            for (final k in learnKinds.entries)
+              Press(
+                onTap: () => editLearn(context, s, kind: k.key),
+                label: 'Add ${k.key}',
+                child: Container(
+                  decoration: BoxDecoration(color: C.chip, borderRadius: BorderRadius.circular(18)),
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Container(width: 34, height: 34, decoration: BoxDecoration(color: C.white, borderRadius: BorderRadius.circular(12)), child: Icon(k.value.$1, size: 18)),
+                    const SizedBox(height: 6),
+                    Text(k.key, style: t(11, w: w6)),
+                  ]),
+                ),
+              ),
+          ],
+        ),
       ),
+      RowsPanel(title: 'My learning', hint: 'swipe ← to delete', empty: 'Nothing yet. Tap a type above.', rows: [
+        for (final (col, x) in list)
+          Row2(
+            swipeId: 'learn-${x['id']}',
+            leading: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(color: const Color(0xFFEFEDFF), borderRadius: BorderRadius.circular(12)),
+              child: Icon(col == 'books' ? Icons.menu_book_rounded : (learnKinds['${x['kind']}']?.$1 ?? Icons.school_outlined), size: 18, color: const Color(0xFF4A3FB0)),
+            ),
+            title: '${x['name'] ?? x['title']}',
+            sub: '${col == 'books' ? 'Book' : (x['kind'] ?? 'Course')} · ${doneOf(col, x)} of ${totalOf(col, x)} ${unitOf(col, x)}',
+            progress: doneOf(col, x) / (totalOf(col, x) == 0 ? 1 : totalOf(col, x)),
+            trailing: Press(
+              onTap: () => logLearn(context, s, col, x),
+              label: 'Log ${x['name'] ?? x['title']}',
+              child: Container(height: 34, padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: C.lime, borderRadius: BorderRadius.circular(999)), child: Center(widthFactor: 1, child: Text('+ Log', style: t(12.5, w: w6, c: C.onLime)))),
+            ),
+            onDots: () => showMenuSheet(context, '${x['name'] ?? x['title']}', [
+              MenuItem('Log progress', Icons.add_rounded, () => logLearn(context, s, col, x)),
+              MenuItem('Edit', Icons.edit_outlined, () => editLearn(context, s, col: col, item: x)),
+              MenuItem('Delete', Icons.delete_outline_rounded, () => s.remove(col, x['id'] as String), danger: true),
+            ]),
+            onDelete: () => s.remove(col, x['id'] as String),
+            onUndo: () => s.save(col, x),
+          ),
+      ]),
     ]);
   }
+}
 
-  void _add(BuildContext context, Store s, String kind) {
-    final name = TextEditingController();
-    final book = kind == 'A book';
-    var n = book ? 300 : 20;
-    showSheet(context, book ? 'New book' : 'New $kind course', (ctx, set) => Col([
-          SoftField(controller: name, hint: book ? 'Atomic Habits' : (kind == 'Quran' ? 'Tajweed' : 'Arabic basics'), pill: true),
-          Stepper2(value: '$n', unit: book ? 'pages' : 'lessons', onMinus: () => set(() => n = (n - (book ? 20 : 5)).clamp(1, 5000)), onPlus: () => set(() => n += book ? 20 : 5)),
-          PressPill('Add', success: true, onTap: () {
-            final v = name.text.trim();
-            if (v.isEmpty) return;
-            book ? s.add('books', {'title': v, 'pages': n, 'page': 0, 'done': false}) : s.add('courses', {'name': v, 'total': n, 'done': 0, 'kind': kind, 'logs': <String, dynamic>{}});
-            Navigator.pop(ctx);
-          }),
-        ], space: 12));
-  }
+/// How many pages / lessons / videos you did.
+void logLearn(BuildContext context, Store s, String col, Json x) {
+  final unit = LearnPage.unitOf(col, x);
+  final done = LearnPage.doneOf(col, x), total = LearnPage.totalOf(col, x);
+  var add = unit == 'pages' ? 10 : 1;
+  showSheet(context, 'Log ${x['name'] ?? x['title']}', (ctx, set) => Col([
+        Text('Now $done of $total $unit', style: t(13, c: C.muted)),
+        Stepper2(value: '+$add', unit: unit, onMinus: () => set(() => add = math.max(1, add - 1)), onPlus: () => set(() => add++), onType: (v) => set(() => add = math.max(1, v.round()))),
+        Chips(options: unit == 'pages' ? const ['+5', '+10', '+20', '+50'] : const ['+1', '+2', '+3', '+5'], selected: {'+$add'}, onTap: (v) => set(() => add = int.parse(v.substring(1)))),
+        PressPill('Save', success: true, onTap: () {
+          final n = math.min(total, done + add);
+          if (col == 'books') {
+            s.patch('books', x['id'] as String, {'page': n, 'done': n >= total, if (n >= total) 'finishedAt': DateTime.now().millisecondsSinceEpoch});
+          } else {
+            final logs = Map<String, dynamic>.from(x['logs'] as Map? ?? {});
+            logs[todayKey] = ((logs[todayKey] ?? 0) as num) + add;
+            s.patch('courses', x['id'] as String, {'done': n, 'logs': logs});
+          }
+          if (n >= total) Haptic.celebrate();
+          Navigator.pop(ctx);
+          toast(context, n >= total ? 'Finished! MashaAllah.' : '+$add $unit · $n of $total');
+        }),
+      ], space: 12));
+}
+
+/// Add or edit a book, course, video series…
+void editLearn(BuildContext context, Store s, {String kind = 'Course', String? col, Json? item}) {
+  final name = TextEditingController(text: '${item?['name'] ?? item?['title'] ?? ''}');
+  var k = col == 'books' ? 'Book' : '${item?['kind'] ?? kind}';
+  var unit = item == null ? learnKinds[k]!.$2 : LearnPage.unitOf(col!, item);
+  var total = item == null ? (unit == 'pages' ? 300 : 20) : LearnPage.totalOf(col!, item);
+  showSheet(context, item == null ? 'New $k' : 'Edit', (ctx, set) => Col([
+        SoftField(controller: name, hint: k == 'Book' ? 'Atomic Habits' : k == 'YouTube' ? 'Arabic for beginners' : 'Flutter course', pill: true),
+        Chips(options: learnKinds.keys.toList(), selected: {k}, onTap: (v) => set(() {
+              k = v;
+              unit = learnKinds[v]!.$2;
+            })),
+        Text('Counted in', style: t(14, w: w6)),
+        Chips(options: {...['pages', 'chapters', 'lessons', 'modules', 'videos', 'episodes', 'hours'], unit}.toList(), selected: {unit}, onTap: (v) => set(() => unit = v)),
+        Text('How many in total', style: t(14, w: w6)),
+        Stepper2(value: '$total', unit: unit, onMinus: () => set(() => total = math.max(1, total - (unit == 'pages' ? 10 : 1))), onPlus: () => set(() => total += unit == 'pages' ? 10 : 1), onType: (v) => set(() => total = math.max(1, v.round()))),
+        PressPill('Save', success: true, onTap: () {
+          final n = name.text.trim();
+          if (n.isEmpty) return;
+          if (item == null) {
+            s.add('courses', {'name': n, 'kind': k, 'unit': unit, 'total': total, 'done': 0, 'logs': <String, dynamic>{}});
+          } else if (col == 'books') {
+            s.patch('books', item['id'] as String, {'title': n, 'pages': total});
+          } else {
+            s.patch('courses', item['id'] as String, {'name': n, 'kind': k, 'unit': unit, 'total': total});
+          }
+          Navigator.pop(ctx);
+        }),
+      ], space: 12));
 }
 
 // ------------------------------------------------------------------ Rewards
