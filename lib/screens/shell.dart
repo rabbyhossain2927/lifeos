@@ -1,7 +1,5 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
+import '../services/backup.dart';
 import '../services/license_service.dart';
 import '../services/life.dart';
 import '../services/local.dart';
@@ -52,7 +50,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver, SingleTicker
       if (!mounted) return;
       final s = store(context, listen: false);
       await License.recheck(s);
-      await autoBackup(s);
+      await Backup.auto(s);
       await _checkUpdate();
     });
   }
@@ -233,37 +231,4 @@ class TabBody extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Where the phone backup file goes: the Download folder when Android lets us,
-/// else the app's own folder.
-Future<File> backupFile() async {
-  final dl = Directory('/storage/emulated/0/Download');
-  try {
-    if (await dl.exists()) {
-      final f = File('${dl.path}/LifeOS-backup.json');
-      await f.writeAsString('', flush: true);
-      return f;
-    }
-  } catch (_) {}
-  final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
-  return File('${dir.path}/LifeOS-backup.json');
-}
-
-/// Writes all data to the phone. Returns the file.
-Future<File> backupToPhone(Store s) async {
-  final f = await backupFile();
-  await f.writeAsString(const JsonEncoder.withIndent(' ').convert(s.exportAll()), flush: true);
-  await Local.setLastBackup(DateTime.now().millisecondsSinceEpoch);
-  return f;
-}
-
-/// Once a day, if auto backup is on.
-Future<void> autoBackup(Store s) async {
-  if (s.settings['autoBackup'] == false) return;
-  if (DateTime.now().millisecondsSinceEpoch - Local.lastBackup < 20 * 3600 * 1000) return;
-  try {
-    await s.syncQuietly();
-    await backupToPhone(s);
-  } catch (_) {}
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/life.dart';
+import '../services/local.dart';
+import '../services/photos.dart';
 import '../services/store.dart';
 import '../widgets/kit.dart';
 import '../widgets/motion.dart';
@@ -32,6 +34,11 @@ class Avatar extends StatelessWidget {
     var c = Color(((s.settings['avatarColor'] ?? 0xFF111111) as num).toInt());
     if (onDark && c.computeLuminance() < 0.05) c = C.lime; // black on the black card would vanish
     final dark = c.computeLuminance() < 0.3;
+    final url = '${(s.settings['avatar'] as Map?)?['url'] ?? ''}';
+    final local = Local.avatarPath;
+    if (s.settings['avatar'] != null && (local.isNotEmpty || url.isNotEmpty)) {
+      return ClipOval(child: SizedBox(width: size, height: size, child: PhotoBox({'local': local, 'url': url}, size: size, radius: 0)));
+    }
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       width: size,

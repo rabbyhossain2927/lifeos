@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -6,9 +5,11 @@ import 'package:url_launcher/url_launcher.dart';
 import '../config.dart';
 import '../services/api.dart';
 import '../services/auth_service.dart';
+import '../services/backup.dart';
 import '../services/license_service.dart';
 import '../services/life.dart';
 import '../services/local.dart';
+import '../services/photos.dart';
 import '../services/prayer.dart';
 import '../services/store.dart';
 import '../services/update_service.dart';
@@ -20,8 +21,10 @@ import 'home.dart';
 import 'shell.dart';
 import 'update_screen.dart';
 
-/// "26.0.0" -> "26.0"
-String niceVersion(String v) => v.endsWith('.0') && v.split('.').length == 3 ? v.substring(0, v.length - 2) : v;
+const feedbackEmail = 'hello@rabbyhossain.com';
+
+/// "26.1.0" stays "26.1.0"; shown as "LifeOS 26.1.0".
+String niceVersion(String v) => v;
 
 class AccountTab extends StatefulWidget {
   const AccountTab({super.key});
@@ -30,7 +33,7 @@ class AccountTab extends StatefulWidget {
 }
 
 class _AccountTabState extends State<AccountTab> {
-  String version = '26.0';
+  String version = '26.1.0';
   String update = 'idle'; // idle, checking, available, latest, error
   UpdateInfo? found;
 
@@ -38,7 +41,7 @@ class _AccountTabState extends State<AccountTab> {
   void initState() {
     super.initState();
     UpdateService.current().then((v) {
-      if (mounted) setState(() => version = niceVersion(v.version));
+      if (mounted) setState(() => version = v.version);
     }).catchError((_) {});
   }
 
@@ -65,20 +68,16 @@ class _AccountTabState extends State<AccountTab> {
     final s = store(context);
     final pro = License.isPro(s);
     final name = userName(s);
-    final lastBackup = Local.lastBackup;
-    final theme = '${s.settings['theme'] ?? 'Light'}';
-
+    final lastBackup = math.max(Local.lastBackup, Backup.lastDrive);
     Widget icon(IconData i, (Color, Color) c) => Container(width: 36, height: 36, decoration: BoxDecoration(color: c.$1, borderRadius: BorderRadius.circular(12)), child: Icon(i, size: 18, color: c.$2));
-    final lime = (C.limeSoft, Color(0xFF4D5A10)), violet = (Color(0xFFEFEDFF), Color(0xFF4A3FB0)), blue = (Color(0xFFE7F1FB), Color(0xFF1F4F86)), grey = (C.chip, Color(0xFF4A4A52));
-    const chev = Icon(Icons.chevron_right_rounded, color: Color(0xFF8A8A84));
-    Row2 link(String title, String sub, IconData i, (Color, Color) c, VoidCallback onTap) => Row2(title: title, sub: sub, leading: icon(i, c), trailing: chev, onTap: onTap);
-
+    final lime = (C.limeSoft, C.limeText), violet = (Look.dark ? const Color(0xFF2E2A4A) : const Color(0xFFEFEDFF), const Color(0xFF7C6FE0)), blue = (Look.dark ? const Color(0xFF1C2B3A) : const Color(0xFFE7F1FB), const Color(0xFF3B7BC4)), grey = (C.chip, C.muted);
+    Row2 link(String title, String sub, IconData i, (Color, Color) c, VoidCallback onTap) => Row2(title: title, sub: sub, leading: icon(i, c), trailing: Icon(Icons.chevron_right_rounded, color: C.muted), onTap: onTap);
     final upSub = switch (update) {
       'checking' => 'Checking…',
-      'available' => '${found?.version} is ready',
+      'available' => 'LifeOS ${found?.version} is ready',
       'latest' => 'You have the latest',
       'error' => 'Could not check. Try again.',
-      _ => '$version installed',
+      _ => 'LifeOS $version installed',
     };
 
     return TabBody(children: [
@@ -88,45 +87,54 @@ class _AccountTabState extends State<AccountTab> {
         decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(28)),
         child: Col([
           Row(children: [
-            const Avatar(size: 60, onDark: true),
+            Press(onTap: () => editProfile(context), label: 'Change photo', child: const Avatar(size: 60, onDark: true)),
             const SizedBox(width: 14),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(name.isEmpty ? 'Add your name' : name, style: t(20, w: w6, c: C.white)),
                 const SizedBox(height: 3),
-                Text('${pro ? 'LifeOS Pro' : 'Free plan'} · Google account', style: t(13, c: C.darkMuted)),
+                Text('${pro ? 'LifeOS Pro' : 'Free plan'} · Google account', style: t(12.5, c: C.darkMuted)),
               ]),
             ),
             Press(
               onTap: () => editProfile(context),
               label: 'Edit profile',
-              child: Container(height: 40, padding: const EdgeInsets.symmetric(horizontal: 14), alignment: Alignment.center, decoration: BoxDecoration(color: const Color(0xFF262626), borderRadius: BorderRadius.circular(999)), child: Text('Edit', style: t(13, w: w6, c: C.white))),
+              child: Container(height: 40, padding: const EdgeInsets.symmetric(horizontal: 14), decoration: BoxDecoration(color: C.dark2.withValues(alpha: Look.dark ? 0.2 : 1), borderRadius: BorderRadius.circular(999)), child: Center(widthFactor: 1, child: Text('Edit', style: t(13, w: w6, c: C.white)))),
             ),
           ]),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: const Color(0xFF1E1E1E), borderRadius: BorderRadius.circular(22)),
-            child: Row(children: [
-              LevelBadge(level: s.lvl),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Col([
-                  Row(children: [
-                    Expanded(child: Text('Level ${s.lvl} · ${s.lvlName}', style: t(13, w: w6, c: C.white))),
-                    CountText(s.xpInLevel, style: t(13, w: w6, c: C.lime), format: (v) => '${v.round()} / 1000 XP'),
-                  ]),
-                  Bar(s.xpInLevel / 1000, color: C.lime, track: const Color(0xFF333333)),
-                  Text('${1000 - s.xpInLevel} XP to level ${s.lvl + 1} · earn XP by doing habits and goals', style: t(12, c: C.darkMuted, h: 1.35)),
-                ], space: 6),
-              ),
-            ]),
+          // The XP card opens the XP dashboard.
+          Press(
+            onTap: () => push(context, const XpPage()),
+            label: 'Open XP dashboard',
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: C.dark2.withValues(alpha: Look.dark ? 0.12 : 1), borderRadius: BorderRadius.circular(22)),
+              child: Row(children: [
+                LevelBadge(level: s.lvl),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Col([
+                    Row(children: [
+                      Expanded(child: Text('Level ${s.lvl} · ${s.lvlName}', style: t(13, w: w6, c: C.white))),
+                      CountText(s.xpInLevel, style: t(13, w: w6, c: Look.dark ? C.limeText : C.lime), format: (v) => '${v.round()} / 1000 XP'),
+                    ]),
+                    Bar(s.xpInLevel / 1000, color: C.lime, track: C.dark3),
+                    Row(children: [
+                      Expanded(child: Text('${1000 - s.xpInLevel} XP to level ${s.lvl + 1}', style: t(12, c: C.darkMuted))),
+                      Text('See all', style: t(12, w: w6, c: C.white)),
+                      Icon(Icons.chevron_right_rounded, size: 16, color: C.white),
+                    ]),
+                  ], space: 6),
+                ),
+              ]),
+            ),
           ),
         ], space: 16),
       ),
       _group('Account', [
-        link('Edit profile', 'Name and avatar', Icons.person_outline_rounded, lime, () => editProfile(context)),
+        link('Edit profile', 'Name, photo and colour', Icons.person_outline_rounded, lime, () => editProfile(context)),
         link('License', pro ? 'Pro · active' : 'Free plan · add a key', Icons.key_outlined, lime, () => licenseSheet(context)),
-        link('Backup', lastBackup == 0 ? 'Not backed up to this phone yet' : 'Last backup: ${_when(lastBackup)}', Icons.cloud_upload_outlined, lime, () => backupSheet(context).then((_) => setState(() {}))),
+        link('Backup', lastBackup == 0 ? 'Google Drive, phone and server' : 'Last backup: ${_when(lastBackup)}', Icons.cloud_upload_outlined, lime, () => push(context, const BackupPage()).then((_) => setState(() {}))),
       ]),
       _group('App', [
         Row2(
@@ -143,61 +151,24 @@ class _AccountTabState extends State<AccountTab> {
               decoration: BoxDecoration(color: update == 'available' ? C.lime : C.chip, borderRadius: BorderRadius.circular(999)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 if (update == 'checking') ...[SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: C.ink)), const SizedBox(width: 6)],
-                Text(update == 'checking' ? 'Wait' : update == 'available' ? 'Update' : 'Check', style: t(13, w: w6)),
+                Text(update == 'checking' ? 'Wait' : update == 'available' ? 'Update' : 'Check', style: t(13, w: w6, c: update == 'available' ? C.onLime : C.ink)),
               ]),
             ),
           ),
         ),
-        link("What's new", 'See what changed in $version', Icons.card_giftcard_rounded, blue, () => whatsNew(context, version)),
-        link('Preferences', 'Reminders, prayer, haptics, lock', Icons.tune_rounded, violet, () => prefsSheet(context)),
-        Row2(
-          title: 'Theme',
-          sub: theme == 'Light' ? 'Light' : theme,
-          leading: icon(Icons.dark_mode_outlined, violet),
-          trailing: Container(
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(color: C.chip, borderRadius: BorderRadius.circular(999)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              for (final th in const [('Light', Icons.light_mode_outlined), ('Dark', Icons.dark_mode_outlined), ('Auto', Icons.contrast_rounded)])
-                Press(
-                  onTap: () {
-                    if (th.$1 != 'Light') {
-                      say(context, 'Dark mode is coming in the next update. Light for now.', good: false);
-                      return;
-                    }
-                    s.setSetting('theme', th.$1);
-                  },
-                  haptic: Haptic.select,
-                  label: '${th.$1} theme',
-                  selected: theme == th.$1,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 38,
-                    height: 34,
-                    decoration: BoxDecoration(color: theme == th.$1 ? C.ink : Colors.transparent, borderRadius: BorderRadius.circular(999)),
-                    child: Icon(th.$2, size: 16, color: theme == th.$1 ? C.lime : C.muted),
-                  ),
-                ),
-            ]),
-          ),
-        ),
+        link("What's new", 'Last 5 updates', Icons.card_giftcard_rounded, blue, () => push(context, WhatsNewPage(current: version))),
+        link('Preferences', 'Week start, time, notifications and more', Icons.tune_rounded, violet, () => push(context, const PrefsPage())),
+        link('Theme', '${Look.theme} · ${Look.mode}${Look.texture ? ' · texture' : ''}', Icons.palette_outlined, violet, () => push(context, const ThemePage())),
       ]),
       _group('Help', [
-        link('How to use', '5 quick steps', Icons.menu_book_outlined, grey, () => howTo(context)),
-        link('About LifeOS', 'Version and maker', Icons.info_outline_rounded, grey, () => about(context, version)),
+        link('How to use', 'Everything, step by step', Icons.menu_book_outlined, grey, () => push(context, const HowToPage())),
+        link('About LifeOS', 'LifeOS $version', Icons.info_outline_rounded, grey, () => push(context, AboutPage(version: version))),
         link('Terms and conditions', 'Privacy and use', Icons.description_outlined, grey, () => terms(context)),
-        link('Feedback', 'Report a bug or share an idea', Icons.chat_bubble_outline_rounded, grey, () => feedback(context, version)),
+        link('Feedback', feedbackEmail, Icons.chat_bubble_outline_rounded, grey, () => push(context, FeedbackPage(version: version))),
       ]),
       PressPill('Sign out', bg: C.white, fg: C.warn, height: 54, onTap: () => signOutSheet(context)),
-      Center(child: Text('LifeOS $version', style: t(12, c: const Color(0xFF8A8A84)))),
+      Center(child: Text('LifeOS $version', style: t(12, c: C.muted))),
     ]);
-  }
-
-  String _when(int ms) {
-    final d = DateTime.fromMillisecondsSinceEpoch(ms);
-    final now = DateTime.now();
-    final day = dayKey(d) == todayKey ? 'Today' : dayKey(d) == dayKey(now.subtract(const Duration(days: 1))) ? 'Yesterday' : shortDate(d);
-    return '$day, ${hmA(d)}';
   }
 
   Widget _group(String name, List<Row2> rows) => Col([
@@ -206,7 +177,24 @@ class _AccountTabState extends State<AccountTab> {
       ], space: 8);
 }
 
-/// Hexagon level badge.
+String _when(int ms) {
+  final d = DateTime.fromMillisecondsSinceEpoch(ms);
+  final now = DateTime.now();
+  final day = dayKey(d) == todayKey ? 'Today' : dayKey(d) == dayKey(now.subtract(const Duration(days: 1))) ? 'Yesterday' : shortDate(d);
+  return '$day, ${hmA(d)}';
+}
+
+/// A page from the Account tab.
+class AccountPage extends StatelessWidget {
+  final String title, subtitle;
+  final IconData icon;
+  final List<Widget> children;
+  final Widget? trailing;
+  const AccountPage({super.key, required this.title, required this.subtitle, required this.icon, required this.children, this.trailing});
+  @override
+  Widget build(BuildContext context) => ToolPage(title: title, subtitle: subtitle, icon: icon, colors: (C.lime, C.onLime), trailing: trailing, children: children);
+}
+
 class LevelBadge extends StatelessWidget {
   final int level;
   const LevelBadge({super.key, required this.level});
@@ -223,8 +211,8 @@ class LevelBadge extends StatelessWidget {
             painter: _HexPainter(),
             child: Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text('LV', style: t(9, w: FontWeight.w700, h: 1)),
-                Text('$level', style: t(19, w: FontWeight.w700, h: 1.1)),
+                Text('LV', style: t(9, w: FontWeight.w700, h: 1, c: C.onLime)),
+                Text('$level', style: t(19, w: FontWeight.w700, h: 1.1, c: C.onLime)),
               ]),
             ),
           ),
@@ -260,30 +248,116 @@ class _HexPainter extends CustomPainter {
   bool shouldRepaint(_HexPainter o) => false;
 }
 
-// ------------------------------------------------------------------ sheets
 
+// ------------------------------------------------------------------ XP dashboard
+class XpPage extends StatelessWidget {
+  const XpPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final s = store(context);
+    final week = [for (final k in s.last7) s.xpOn(k)];
+    final total = week.fold<int>(0, (a, b) => a + b);
+    var best = 0, bestI = 0;
+    for (var i = 0; i < 7; i++) {
+      if (week[i] > best) {
+        best = week[i];
+        bestI = i;
+      }
+    }
+    final src = s.xpSources(s.last7);
+    const srcIcons = {'Prayers': Icons.mosque_outlined, 'Goal steps': Icons.flag_outlined, 'Habits': Icons.check_rounded, 'Journal': Icons.menu_book_outlined};
+    const srcRule = {'Prayers': '+10 each', 'Goal steps': '+10 each day you log', 'Habits': '+5 each', 'Journal': '+5 each entry'};
+    // Recent XP from the last 3 days.
+    final recent = <(String, String, int)>[];
+    for (var i = 0; i < 3; i++) {
+      final k = dayKey(DateTime.now().subtract(Duration(days: i)));
+      final when = i == 0 ? 'Today' : i == 1 ? 'Yesterday' : shortDate(parseDay(k));
+      for (final p in s.prayedOn(k)) {
+        recent.add(('$p prayed', when, 10));
+      }
+      for (final h in s.list('habits').where((h) => s.habitDone(h, k))) {
+        recent.add(('${h['name']}', when, 5));
+      }
+      for (final g in s.list('goals').where((g) => (g['logs'] as Map? ?? {})[k] != null)) {
+        recent.add(('${g['title']}', when, 10));
+      }
+      if ('${s.day(k)['text'] ?? ''}'.trim().isNotEmpty) recent.add(('Journal entry', when, 5));
+    }
+    final names = ['Starter', 'Steady', 'Steady', 'Strong', 'Strong', 'Strong', 'Focused', 'Focused', 'Focused', 'Master'];
+    return AccountPage(title: 'XP and level', subtitle: 'How you earn and grow', icon: Icons.emoji_events_outlined, children: [
+      HeroCard(tone: HeroTone.lime, label: 'Level ${s.lvl} · ${s.lvlName}', big: '${s.xp} XP total', sub: '${1000 - s.xpInLevel} XP to level ${s.lvl + 1} · ${s.points} points to spend', ring: s.xpInLevel / 1000, ringText: 'LV ${s.lvl}'),
+      Row(children: gap([
+        Expanded(child: _stat('This week', '+$total', 'XP', dark: true)),
+        Expanded(child: _stat('Best day', '+$best', best == 0 ? '—' : s.last7Letters[bestI])),
+        Expanded(child: _stat('Streak', '${s.dayStreak}', 'days')),
+      ], 8)),
+      HeroCard(tone: HeroTone.white, label: 'Last 7 days', big: '+$total XP', sub: 'Every bar is one day', bars: [for (var i = 0; i < 7; i++) (week[i].toDouble(), s.last7Letters[i])]),
+      RowsPanel(title: 'Where your XP comes from', hint: 'this week', rows: [
+        for (final e in src.entries)
+          Row2(
+            leading: Container(width: 36, height: 36, decoration: BoxDecoration(color: C.limeSoft, borderRadius: BorderRadius.circular(12)), child: Icon(srcIcons[e.key], size: 18, color: C.limeText)),
+            title: e.key,
+            sub: srcRule[e.key],
+            right: '${e.value}',
+          ),
+      ]),
+      RowsPanel(title: 'Levels', rows: [
+        for (var l = s.lvl + 1; l <= math.min(s.lvl + 3, 12); l++)
+          Row2(title: 'Level $l · ${names[math.min(l - 1, 9)]}', sub: 'at ${(l - 1) * 1000} XP · ${(l - 1) * 1000 - s.xp} to go', progress: (s.xp / ((l - 1) * 1000)).clamp(0.0, 1.0)),
+      ]),
+      RowsPanel(title: 'Recent', empty: 'Pray, tick a habit or log a goal to earn XP.', rows: [
+        for (final r in recent.take(12)) Row2(title: r.$1, sub: r.$2, right: '+${r.$3}'),
+      ]),
+      NoteCard('Points vs XP', 'XP only grows and sets your level. Points are XP you can spend on treats in Rewards.'),
+    ]);
+  }
+
+  Widget _stat(String k, String v, String sub, {bool dark = false}) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: dark ? C.ink : C.white, borderRadius: BorderRadius.circular(20)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(k, style: t(11, c: dark ? C.darkMuted : C.muted)),
+          Text(v, style: t(20, w: w6, c: dark ? C.white : C.ink)),
+          Text(sub, style: t(11, c: dark ? (Look.dark ? C.limeText : C.lime) : C.muted)),
+        ]),
+      );
+}
+
+// ------------------------------------------------------------------ profile
 void editProfile(BuildContext context) {
   final s = store(context, listen: false);
   final name = TextEditingController(text: userName(s));
-  var color = ((s.settings['avatarColor'] ?? 0xFF111111) as num).toInt();
-  const colors = [0xFF111111, 0xFFD4F06B, 0xFFC7B8FF, 0xFFFFC9A8, 0xFFA8E6CF];
+  var color = ((s.settings['avatarColor'] ?? 0xFF1F1F23) as num).toInt();
+  const colors = [0xFF1F1F23, 0xFFD4F06B, 0xFFC7B8FF, 0xFFFFC9A8, 0xFFA8E6CF];
+  var busy = false;
   showSheet(context, 'Edit profile', (ctx, set) {
-    final c = Color(color);
-    final n = name.text.trim();
+    Future<void> pick(bool camera) async {
+      final path = await Photos.pickOne(camera: camera, round: true);
+      if (path == null) return;
+      set(() => busy = true);
+      await Local.setAvatarPath(path);
+      s.setSetting('avatar', {'url': ''});
+      final url = await Photos.upload(path);
+      if (url != null) s.setSetting('avatar', {'url': url});
+      set(() => busy = false);
+    }
+
     return Col([
-      Center(
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 84,
-          height: 84,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: c, shape: BoxShape.circle),
-          child: Text(n.isEmpty ? 'L' : n[0].toUpperCase(), style: t(34, w: FontWeight.w700, c: c.computeLuminance() < 0.3 ? C.lime : C.ink)),
-        ),
-      ),
+      Center(child: Stack(alignment: Alignment.center, children: [const Avatar(size: 96), if (busy) const SizedBox(width: 96, height: 96, child: CircularProgressIndicator(strokeWidth: 2, color: C.lime))])),
+      Row(children: gap([
+        Expanded(child: PressPill('Gallery', icon: Icons.photo_library_outlined, bg: C.chip, fg: C.ink, height: 46, onTap: () => pick(false))),
+        Expanded(child: PressPill('Camera', icon: Icons.photo_camera_outlined, bg: C.chip, fg: C.ink, height: 46, onTap: () => pick(true))),
+      ], 8)),
+      if (Local.avatarPath.isNotEmpty || ('${(s.settings['avatar'] as Map?)?['url'] ?? ''}').isNotEmpty)
+        PressPill('Remove photo', bg: Colors.transparent, fg: C.warn, height: 40, onTap: () async {
+          await Local.setAvatarPath('');
+          s.setSetting('avatar', null);
+          set(() {});
+        }),
+      Text('Crop it round after you pick it. Saved on your phone and your LifeOS server.', style: t(12, c: C.muted)),
       Text('Name', style: t(14, w: w6)),
-      SoftField(controller: name, hint: 'Your name', pill: true, onChanged: (_) => set(() {})),
-      Text('Avatar colour', style: t(14, w: w6)),
+      SoftField(controller: name, hint: 'Your name', pill: true),
+      Text('Colour (when there is no photo)', style: t(14, w: w6)),
       Row(children: [
         for (final k in colors)
           Padding(
@@ -295,14 +369,13 @@ void editProfile(BuildContext context) {
               selected: color == k,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(color: Color(k), shape: BoxShape.circle, border: Border.all(color: color == k ? C.ink : C.white, width: 3), boxShadow: const [BoxShadow(color: Color(0xFFDAD8DF), spreadRadius: 1)]),
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(color: Color(k), shape: BoxShape.circle, border: Border.all(color: color == k ? C.ink : C.white, width: 3), boxShadow: [BoxShadow(color: C.border, spreadRadius: 1)]),
               ),
             ),
           ),
       ]),
-      Text('Signed in with Google${AuthService.user?.email == null ? '' : ' as ${AuthService.user!.email}'}.', style: t(13, c: C.muted)),
       PressPill('Save', success: true, onTap: () {
         if (name.text.trim().isNotEmpty) s.setSetting('name', name.text.trim());
         s.setSetting('avatarColor', color);
@@ -327,7 +400,7 @@ void licenseSheet(BuildContext context) {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(22)),
           child: Col([
-            Tag('PRO · ACTIVE', bg: C.lime, fg: C.ink),
+            const Tag('PRO · ACTIVE', bg: C.lime, fg: C.onLime),
             Text(k.length > 4 ? '${k.substring(0, k.length > 5 ? 5 : 0)}••••-${k.substring(k.length - 4)}' : k, style: t(17, w: w6, c: C.white, ls: 0.6)),
             Text('${l?['product'] ?? 'LifeOS Pro'} · works on every phone with this Google account', style: t(12, c: C.darkMuted)),
           ], space: 6),
@@ -372,194 +445,417 @@ void licenseSheet(BuildContext context) {
   });
 }
 
-Future<void> backupSheet(BuildContext context) {
-  final s = store(context, listen: false);
-  var busy = '';
-  return showSheet(context, 'Backup', (ctx, set) {
-    final last = Local.lastBackup;
+
+// ------------------------------------------------------------------ backup
+class BackupPage extends StatefulWidget {
+  const BackupPage({super.key});
+  @override
+  State<BackupPage> createState() => _BackupPageState();
+}
+
+class _BackupPageState extends State<BackupPage> {
+  String busy = '';
+  List<BackupItem>? last;
+  bool? drive;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final l = await Backup.lastFive();
+    final d = await Backup.driveConnected();
+    if (mounted) {
+      setState(() {
+        last = l;
+        drive = d;
+      });
+    }
+  }
+
+  Future<void> run(String what, Future<String?> Function() f) async {
+    if (busy.isNotEmpty) return;
+    setState(() => busy = what);
+    try {
+      final msg = await f();
+      Haptic.success();
+      if (mounted && msg != null) toast(context, msg);
+    } catch (e) {
+      Haptic.warn();
+      if (mounted) toast(context, e is ApiError ? e.message : '$e');
+    }
+    if (mounted) setState(() => busy = '');
+    await _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = store(context);
     final synced = s.lastSyncedAt;
     final count = Store.collections.fold<int>(0, (a, c) => a + s.list(c).length);
-    Future<void> run(String what, Future<void> Function() f) async {
-      if (busy.isNotEmpty) return;
-      set(() => busy = what);
-      try {
-        await f();
-      } catch (e) {
-        Haptic.warn();
-        if (ctx.mounted) toast(ctx, e is ApiError ? e.message : 'That did not work: $e');
-      }
-      set(() => busy = '');
-    }
-
-    return Col([
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(22)),
-        child: Col([
-          Text('Last backup', style: t(12, w: w6, c: C.lime)),
-          Text(last == 0 ? 'Not yet on this phone' : '${dayKey(DateTime.fromMillisecondsSinceEpoch(last)) == todayKey ? 'Today' : shortDate(DateTime.fromMillisecondsSinceEpoch(last))}, ${hmA(DateTime.fromMillisecondsSinceEpoch(last))}', style: t(20, w: w6, c: C.white)),
-          Text('$count items · ${synced == null ? 'not synced to your server yet' : 'server synced at ${hmA(synced)}'}', style: t(12, c: C.darkMuted)),
-        ], space: 4),
-      ),
-      Row(children: [
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Auto backup', style: t(15, w: w5)),
-            Text('Once a day, saved to this phone', style: t(12, c: C.muted)),
-          ]),
-        ),
-        Toggle(on: s.settings['autoBackup'] != false, label: 'Auto backup', onChanged: (v) => set(() => s.setSetting('autoBackup', v))),
-      ]),
-      PressPill(busy == 'now' ? 'Backing up…' : 'Back up now', onTap: () => run('now', () async {
-            await s.sync();
-            final f = await backupToPhone(s);
-            Haptic.success();
-            if (ctx.mounted) toast(ctx, 'Backup done. Saved to server and ${f.path.contains('Download') ? 'Downloads' : 'phone'}.');
-          })),
-      Row(children: gap([
-        Expanded(
-          child: PressPill(busy == 'file' ? 'Saving…' : 'Save to phone', bg: C.chip, fg: C.ink, height: 50, onTap: () => run('file', () async {
-                final f = await backupToPhone(s);
-                Haptic.success();
-                if (ctx.mounted) toast(ctx, 'Saved: ${f.path}');
-              })),
-        ),
-        Expanded(
-          child: PressPill('Restore', bg: C.chip, fg: C.ink, height: 50, onTap: () => run('restore', () async {
-                final f = await backupFile();
-                if (!await f.exists() || (await f.length()) == 0) throw 'No backup file found. Save one first.';
-                final j = jsonDecode(await f.readAsString());
-                if (!ctx.mounted) return;
-                if (!await confirm(ctx, 'Restore this backup?', ok: 'Restore', body: 'Items from the file are added back. Nothing is deleted.')) return;
-                final n = s.importAll(Map<String, dynamic>.from(j as Map));
-                Haptic.success();
-                if (ctx.mounted) toast(ctx, 'Restored $n items.');
-              })),
-        ),
-      ], 8)),
-    ], space: 12);
-  });
-}
-
-void whatsNew(BuildContext context, String current) {
-  showSheet(context, "What's new", (ctx, _) => FutureBuilder<List<UpdateInfo>>(
-        future: UpdateService.releases(count: 6),
-        builder: (c, snap) {
-          final list = snap.data ?? const <UpdateInfo>[];
-          final items = <(String, List<String>)>[
-            if (!list.any((u) => niceVersion(u.version) == current)) (current, const ['Brand new look, easy and calm', 'Motion and better haptics everywhere', 'Backup and Feedback in Account']),
-            for (final u in list) (niceVersion(u.version), [...u.added, ...u.fixed.map((f) => 'Fixed: $f')]),
-          ];
-          return Col([
-            if (snap.connectionState == ConnectionState.waiting) LinearProgressIndicator(color: C.ink, backgroundColor: C.chip),
-            for (final r in items)
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: C.chip, borderRadius: BorderRadius.circular(22)),
-                child: Col([
-                  Row(children: [
-                    Expanded(child: Text(r.$1, style: t(16, w: w6))),
-                    r.$1 == current ? Tag('Installed', bg: C.ink, fg: C.white) : (UpdateService.isNewer(r.$1, current) ? Tag('New', bg: C.lime, fg: C.ink) : Tag('Older', bg: C.white)),
-                  ]),
-                  if (r.$2.isEmpty) Text('Small fixes.', style: t(14, c: C.muted)),
-                  for (final i in r.$2.take(6))
-                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Padding(padding: const EdgeInsets.only(top: 6), child: Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF6E8A12), shape: BoxShape.circle))),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(i, style: t(14, h: 1.4))),
-                    ]),
-                ], space: 8),
-              ),
-          ], space: 12);
-        },
-      ));
-}
-
-void prefsSheet(BuildContext context) {
-  final s = store(context, listen: false);
-  showSheet(context, 'Preferences', (ctx, set) {
-    Widget tog(String title, String sub, bool on, ValueChanged<bool> f) => Row2(
+    Widget place(String title, String sub, IconData icon, (Color, Color) c, String btn, String key, Future<String?> Function() f) => Row2(
           title: title,
           sub: sub,
-          trailing: Toggle(on: on, label: title, onChanged: (v) => set(() => f(v))),
-        );
-    Widget chips(String title, List<String> opts, String sel, ValueChanged<String> f) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Col([Text(title, style: t(15, w: w5)), Chips(options: opts, selected: {sel}, onTap: (v) => set(() => f(v)))], space: 8),
-        );
-    return Col([
-      tog('Prayer alerts', '10 min before each prayer', s.settings['prayerAlerts'] != false, (v) => s.setSetting('prayerAlerts', v)),
-      tog('Habit nudge', 'At 9 PM if habits are not done', s.settings['habitNudge'] != false, (v) => s.setSetting('habitNudge', v)),
-      tog('Weekly review', 'Friday after Jummah', s.settings['weeklyReview'] != false, (v) => s.setSetting('weeklyReview', v)),
-      tog('Haptic feedback', 'Gentle taps when you press things', Local.haptics, (v) {
-        Local.setHaptics(v);
-        if (v) Haptic.success();
-      }),
-      tog('App lock', Local.pin.isEmpty ? 'Ask for a 4-digit PIN when the app opens' : 'PIN is on', Local.pin.isNotEmpty, (on) async {
-        if (!on) {
-          await Local.setPin('');
-        } else {
-          final v = await showForm(ctx, 'Choose a 4-digit PIN', const [Field('p', 'PIN', type: F.number, required: true, hint: '1234')]);
-          final p = '${v?['p'] ?? ''}'.replaceAll('.0', '');
-          if (p.length == 4) {
-            await Local.setPin(p);
-          } else if (v != null && ctx.mounted) {
-            toast(ctx, 'The PIN must be 4 digits.');
-          }
-        }
-        set(() {});
-      }),
-      chips('Asr time', const ['Hanafi', 'Shafi'], s.shafi ? 'Shafi' : 'Hanafi', (v) => s.setSetting('asr', v)),
-      chips('City for prayer times', PrayerTimes.cities.keys.toList(), s.cityName, (v) {
-        s.setSetting('cityName', v);
-        s.setSetting('city', PrayerTimes.cities[v]);
-      }),
-      chips('Water goal (glasses)', const ['6', '8', '10', '12'], '${s.waterGoal}', (v) => s.setSetting('waterGoal', int.parse(v))),
-      chips('Calorie goal', const ['1600', '1800', '2000', '2200', '2500'], '${s.kcalGoal}', (v) => s.setSetting('kcalGoal', int.parse(v))),
-    ], space: 0);
-  });
-}
-
-void howTo(BuildContext context) {
-  const steps = [
-    ('Check Home each morning', 'All your stats in one look: prayer, habits, water, food, sleep.'),
-    ("Tap, don't type", 'Most things are one tap: tick a habit, add a glass, pick a mood.'),
-    ('Use + for anything new', 'The lime button adds a habit, goal, meal, note or reminder.'),
-    ('Set one goal', 'LifeOS splits it into month, week and a small step for today.'),
-    ('Review on Friday', 'Three quick taps. See what worked and pick next week\'s focus.'),
-  ];
-  showSheet(context, 'How to use', (ctx, _) => Col([
-        for (var i = 0; i < steps.length; i++)
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: C.chip, borderRadius: BorderRadius.circular(20)),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(width: 30, height: 30, alignment: Alignment.center, decoration: const BoxDecoration(color: C.lime, shape: BoxShape.circle), child: Text('${i + 1}', style: t(14, w: FontWeight.w700))),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(steps[i].$1, style: t(15, w: w6)), const SizedBox(height: 2), Text(steps[i].$2, style: t(13, c: C.muted, h: 1.4))])),
-            ]),
+          leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: c.$1, borderRadius: BorderRadius.circular(13)), child: Icon(icon, size: 19, color: c.$2)),
+          trailing: Press(
+            onTap: () => run(key, f),
+            label: btn,
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(color: C.lime, borderRadius: BorderRadius.circular(999)),
+              child: Center(widthFactor: 1, child: busy == key ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: C.onLime)) : Text(btn, style: t(12.5, w: w6, c: C.onLime))),
+            ),
           ),
-      ], space: 10));
+        );
+    return AccountPage(title: 'Backup', subtitle: '$count items · three safe places', icon: Icons.cloud_upload_outlined, children: [
+      RowsPanel(title: 'Back up to', rows: [
+        place('Google Drive', drive == true ? (Backup.lastDrive == 0 ? 'Connected' : 'Last: ${_when(Backup.lastDrive)}') : 'Tap to connect your Google account', Icons.add_to_drive_rounded, (const Color(0xFFE7F1FB), const Color(0xFF1F4F86)),
+            drive == true ? 'Back up' : 'Connect', 'drive', () async {
+          await Backup.toDrive(s);
+          return 'Saved to Google Drive.';
+        }),
+        place('This phone', Local.lastBackup == 0 ? 'Download/LifeOS folder' : 'Last: ${_when(Local.lastBackup)}', Icons.smartphone_rounded, (C.limeSoft, C.limeText), 'Back up', 'phone', () async {
+          final f = await Backup.toPhone(s);
+          return 'Saved: ${f.path.split('/').last}';
+        }),
+        place('LifeOS server', synced == null ? 'Live sync, every change' : 'Live sync · ${hmA(synced)}', Icons.dns_outlined, (const Color(0xFFEFEDFF), const Color(0xFF4A3FB0)), 'Sync', 'server', () async {
+          await s.sync();
+          return 'Synced with your server.';
+        }),
+      ]),
+      RowsPanel(rows: [
+        Row2(
+          title: 'Auto backup every day',
+          sub: 'Phone + Google Drive (when connected)',
+          trailing: Toggle(on: s.settings['autoBackup'] != false, label: 'Auto backup', onChanged: (v) => s.setSetting('autoBackup', v)),
+        ),
+      ]),
+      RowsPanel(
+        title: 'Last 5 backups',
+        hint: 'restore any of them',
+        empty: last == null ? 'Looking…' : 'No backups yet. Tap Back up above.',
+        rows: [
+          for (final b in last ?? const <BackupItem>[])
+            Row2(
+              leading: Icon(b.where == 'Drive' ? Icons.add_to_drive_rounded : Icons.smartphone_rounded, size: 20, color: C.muted),
+              title: _when(b.at.millisecondsSinceEpoch),
+              sub: '${b.where}${b.size.isEmpty ? '' : ' · ${b.size}'}',
+              trailing: Press(
+                onTap: () async {
+                  if (!await confirm(context, 'Restore this backup?', ok: 'Restore', body: 'A backup of what you have now is saved first. Items from the backup are added back; nothing is deleted.')) return;
+                  await run('restore', () async {
+                    final n = await Backup.restore(s, b);
+                    return 'Restored $n items.';
+                  });
+                },
+                label: 'Restore',
+                child: Container(height: 36, padding: const EdgeInsets.symmetric(horizontal: 13), decoration: BoxDecoration(color: C.chip, borderRadius: BorderRadius.circular(999)), child: Center(widthFactor: 1, child: Text('Restore', style: t(12.5, w: w6)))),
+              ),
+            ),
+        ],
+      ),
+      NoteCard('Google Drive', 'Backups go to a hidden LifeOS folder in your own Drive. Only LifeOS can see them. The newest 10 are kept.'),
+    ]);
+  }
 }
 
-void about(BuildContext context, String version) {
-  showSheet(context, 'About LifeOS', (ctx, _) => Col([
-        const LogoMark(size: 76),
-        Text('LifeOS $version', style: t(18, w: w6)),
-        Text('One calm place for prayer, habits, goals, health and the people you love. Made by Rabby Hossain.', textAlign: TextAlign.center, style: t(14, c: C.muted, h: 1.5)),
+// ------------------------------------------------------------------ what's new
+class WhatsNewPage extends StatefulWidget {
+  final String current;
+  const WhatsNewPage({super.key, required this.current});
+  @override
+  State<WhatsNewPage> createState() => _WhatsNewPageState();
+}
+
+class _WhatsNewPageState extends State<WhatsNewPage> {
+  late final Future<List<UpdateInfo>> f = UpdateService.releases(count: 5);
+  String? tab;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<UpdateInfo>>(
+      future: f,
+      builder: (context, snap) {
+        final list = (snap.data ?? const <UpdateInfo>[]).take(5).toList();
+        final names = [for (final u in list) 'LifeOS ${u.version}'];
+        final sel = tab ?? (names.contains('LifeOS ${widget.current}') ? 'LifeOS ${widget.current}' : (names.isEmpty ? '' : names.first));
+        final u = list.where((x) => 'LifeOS ${x.version}' == sel).firstOrNull;
+        final installed = u != null && u.version == widget.current;
+        return AccountPage(title: "What's new", subtitle: 'Last 5 updates', icon: Icons.card_giftcard_rounded, children: [
+          if (snap.connectionState == ConnectionState.waiting) LinearProgressIndicator(color: C.ink, backgroundColor: C.chip),
+          if (snap.hasError) Panel(child: Text('Could not load updates. Check your internet.', style: t(14, c: C.muted))),
+          if (names.isNotEmpty)
+            SizedBox(
+              height: 44,
+              child: ListView(scrollDirection: Axis.horizontal, children: gap([for (final n in names) Chip2(n, on: n == sel, off: C.white, onTap: () => setState(() => tab = n))], 8)),
+            ),
+          if (u != null) ...[
+            HeroCard(
+              label: installed ? 'Installed' : (UpdateService.isNewer(u.version, widget.current) ? 'Newer' : 'Older version'),
+              big: 'LifeOS ${u.version}',
+              sub: [if (u.published != null) niceDate(u.published!.toLocal()), if (u.sizeLabel.isNotEmpty) u.sizeLabel].join(' · '),
+              btns: installed || u.apkUrl.isEmpty
+                  ? null
+                  : [
+                      HeroBtn(UpdateService.isNewer(u.version, widget.current) ? 'Update to this' : 'Download this version', () {
+                        if (UpdateService.isNewer(u.version, widget.current)) {
+                          push(context, const UpdateScreen());
+                        } else {
+                          launchUrl(Uri.parse(u.apkUrl), mode: LaunchMode.externalApplication);
+                        }
+                      }, primary: true),
+                    ],
+            ),
+            RowsPanel(title: 'In this update', empty: 'Small fixes.', rows: [
+              for (final a in u.added) Row2(leading: Icon(Icons.add_circle_outline_rounded, size: 20, color: C.limeText), title: a),
+              for (final x in u.fixed) Row2(leading: Icon(Icons.build_circle_outlined, size: 20, color: C.muted), title: x, sub: 'Fixed'),
+            ]),
+          ],
+          NoteCard('Going back to an older version', 'Android only installs an older version after you uninstall LifeOS. Then sign in again: your data comes back from your server.'),
+        ]);
+      },
+    );
+  }
+}
+
+// ------------------------------------------------------------------ theme
+class ThemePage extends StatelessWidget {
+  const ThemePage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: Look.rev,
+      builder: (context, _, __) => AccountPage(title: 'Theme', subtitle: '${Look.theme} · ${Look.mode}', icon: Icons.palette_outlined, children: [
+        Panel(title: 'Mode', child: Chips(options: const ['Light', 'Dark', 'Auto'], selected: {Look.mode}, onTap: (v) => Look.set('mode', v))),
+        Panel(
+          title: 'Colour',
+          child: GridView.count(
+            crossAxisCount: 4,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 0.95,
+            children: [
+              for (final e in Look.themes.entries)
+                Press(
+                  onTap: () => Look.set('theme', e.key),
+                  haptic: Haptic.select,
+                  label: '${e.key} theme',
+                  selected: Look.theme == e.key,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    decoration: BoxDecoration(
+                      color: Look.theme == e.key ? C.limeSoft : C.chip,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Look.theme == e.key ? C.ink : C.chip, width: 1.5),
+                    ),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [e.value.$2, e.value.$1]),
+                          border: Border.all(color: C.border),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(e.key, style: t(11, w: w6)),
+                    ]),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        RowsPanel(rows: [
+          Row2(title: 'Background texture', sub: 'Soft paper dots', trailing: Toggle(on: Look.texture, label: 'Texture', onChanged: (v) => Look.set('texture', v))),
+        ]),
+        Panel(title: 'Text size', child: Chips(options: const ['Small', 'Normal', 'Large'], selected: {Look.textSize}, onTap: (v) => Look.set('text_size', v))),
+        HeroCard(label: 'Preview', big: "Let's make today count", sub: 'Cards, chips and buttons follow your theme', btns: [HeroBtn('Button', () {}, primary: true), HeroBtn('Second', () {})]),
+      ]),
+    );
+  }
+}
+
+// ------------------------------------------------------------------ preferences
+class PrefsPage extends StatefulWidget {
+  const PrefsPage({super.key});
+  @override
+  State<PrefsPage> createState() => _PrefsPageState();
+}
+
+class _PrefsPageState extends State<PrefsPage> {
+  @override
+  Widget build(BuildContext context) {
+    final s = store(context);
+    Row2 tog(String title, String sub, bool on, ValueChanged<bool> f) => Row2(title: title, sub: sub, trailing: Toggle(on: on, label: title, onChanged: (v) => setState(() => f(v))));
+    const days = {'Saturday': DateTime.saturday, 'Sunday': DateTime.sunday, 'Monday': DateTime.monday};
+    return AccountPage(title: 'Preferences', subtitle: 'Make LifeOS yours', icon: Icons.tune_rounded, children: [
+      Panel(
+        title: 'Week starts on',
+        child: Chips(
+          options: days.keys.toList(),
+          selected: {days.entries.firstWhere((e) => e.value == Local.weekStartDay, orElse: () => days.entries.first).key},
+          onTap: (v) async {
+            await Local.setWeekStart(days[v]!);
+            Look.rev.value++;
+          },
+        ),
+      ),
+      Panel(title: 'Time format', child: Chips(options: const ['12 hour', '24 hour'], selected: {Local.time24 ? '24 hour' : '12 hour'}, onTap: (v) => Look.set('time24', v == '24 hour'))),
+      Panel(title: 'Text size', child: Chips(options: const ['Small', 'Normal', 'Large'], selected: {Look.textSize}, onTap: (v) => Look.set('text_size', v))),
+      Panel(title: 'Money goals use', child: Chips(options: const ['tk', r'$', '€', '£', '₹'], selected: {'${s.settings['currency'] ?? 'tk'}'}, onTap: (v) => s.setSetting('currency', v))),
+      Panel(title: 'Asr time', child: Chips(options: const ['Hanafi', 'Shafi'], selected: {s.shafi ? 'Shafi' : 'Hanafi'}, onTap: (v) => s.setSetting('asr', v))),
+      Panel(
+        title: 'City for prayer times',
+        child: Chips(
+          options: PrayerTimes.cities.keys.toList(),
+          selected: {s.cityName},
+          onTap: (v) {
+            s.setSetting('cityName', v);
+            s.setSetting('city', PrayerTimes.cities[v]);
+          },
+        ),
+      ),
+      RowsPanel(title: 'Notifications', rows: [
+        tog('Prayer alerts', '10 min before each prayer', s.settings['prayerAlerts'] != false, (v) => s.setSetting('prayerAlerts', v)),
+        tog('Habit nudge', 'At 9 PM if habits are not done', s.settings['habitNudge'] != false, (v) => s.setSetting('habitNudge', v)),
+        tog('Weekly review', 'Friday after Jummah', s.settings['weeklyReview'] != false, (v) => s.setSetting('weeklyReview', v)),
+        tog('Morning summary', '7 AM: your day in one line', s.settings['morningSummary'] == true, (v) => s.setSetting('morningSummary', v)),
+      ]),
+      RowsPanel(title: 'App', rows: [
+        tog('Haptic feedback', 'Gentle taps when you press things', Local.haptics, (v) {
+          Local.setHaptics(v);
+          if (v) Haptic.success();
+        }),
+        tog('Reduce motion', 'Fewer animations', Local.reduceMotion, (v) => Look.set('reduce_motion', v)),
+        tog('App lock', Local.pin.isEmpty ? 'Ask for a 4-digit PIN when the app opens' : 'PIN is on', Local.pin.isNotEmpty, (on) async {
+          if (!on) {
+            await Local.setPin('');
+          } else {
+            final v = await showForm(context, 'Choose a 4-digit PIN', const [Field('p', 'PIN', type: F.number, required: true, hint: '1234')]);
+            final p = '${v?['p'] ?? ''}'.replaceAll('.0', '');
+            if (p.length == 4) {
+              await Local.setPin(p);
+            } else if (v != null && context.mounted) {
+              toast(context, 'The PIN must be 4 digits.');
+            }
+          }
+          if (mounted) setState(() {});
+        }),
+      ]),
+    ]);
+  }
+}
+
+// ------------------------------------------------------------------ how to use
+class HowToPage extends StatefulWidget {
+  const HowToPage({super.key});
+  @override
+  State<HowToPage> createState() => _HowToPageState();
+}
+
+class _HowToPageState extends State<HowToPage> {
+  String tab = 'Start';
+  static const guide = <String, List<(String, String)>>{
+    'Start': [
+      ('Open Home each morning', 'All your stats in one look: prayers, habits, water, food, sleep, focus and XP.'),
+      ("Tap, don't type", 'Most things are one tap: tick a habit, fill a glass, pick a mood, tap a food.'),
+      ('Use the lime + button', 'It adds a goal, habit, meal, glass of water, journal line, reminder, date or memory.'),
+      ('Pin your tools', 'Explore → Edit Home → star the tools you use most. They show on Home.'),
+      ('Swipe and ⋯', 'Swipe a row to the left to delete it (Undo shows). Tap ⋯ to edit. Hold a chip to rename it.'),
+    ],
+    'Goals': [
+      ('Tap + on the Goals tab', 'Pick a start like Read books, or Custom and choose your own icon.'),
+      ('Say how much and how often', 'Daily, weekly, half monthly, monthly, quarterly, half yearly, yearly or every N days. Pick the unit: pages, tk, steps, \$ or your own.'),
+      ('Take a suggestion', 'Type a name and LifeOS suggests a full goal. It also shows the split per year, month, week and day.'),
+      ('Pick a small steps plan', 'Weekly gives 7 dated steps, monthly gives a step for every day of the month. Change any day with ⋯, skip a day with a swipe.'),
+      ('Tick or log', 'Tick a step, or use Custom log for any amount on any day. Every bar moves.'),
+      ('Fix a mistake', 'Open Log history, tap ⋯, then Edit amount or Delete.'),
+      ('Ahead or behind', 'It compares what you did with the plan up to today. Behind is a nudge, not a fail.'),
+      ('Review on Friday', 'Goals → Review: how it went, what helped, next week\'s focus.'),
+    ],
+    'Daily': [
+      ('Prayer', 'Tick each prayer when you pray (+10 XP). Prayer alerts come 10 minutes before.'),
+      ('Dhikr', 'Explore → Dhikr. Tap the big circle to count. Add your own dhikr or dua with its target.'),
+      ('Habits', 'Tap a box in the week row to count that day. ⋯ edits the name and colour.'),
+      ('Water and food', 'Tap glasses or add a custom ml amount. Food icons match the name; edit quick add to remove items.'),
+      ('Sleep and mood', 'Pick the hours you slept and see what it means. Pick a mood and what is behind it; add your own.'),
+    ],
+    'Tools': [
+      ('Journal', 'Mark the day positive, neutral or negative, write a few lines. Tap an entry to edit it.'),
+      ('Focus', 'Start the timer. Daily focus shows each day and your total time.'),
+      ('Learn', 'Add a book, course, video series or anything. Log pages or lessons with + Log.'),
+      ('Travel', 'Add trips and visits, a day plan, a packing list and photos. Photos come back next year on the same day.'),
+      ('Self care and memory', 'Self care has a time, repeat and reminder. Memories keep photos, a title, words, date and time.'),
+    ],
+    'Data': [
+      ('Sync', 'Every change syncs to your own LifeOS server, so a new phone gets everything after sign-in.'),
+      ('Backup', 'Account → Backup: Google Drive, this phone and your server. The last 5 backups can be restored.'),
+      ('Theme', 'Account → Theme: 8 colours, paper texture, light, dark or auto.'),
+      ('Updates', 'LifeOS tells you when an update is ready. What\'s new shows the last 5 updates.'),
+    ],
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = guide[tab]!;
+    return AccountPage(title: 'How to use', subtitle: 'Everything, step by step', icon: Icons.menu_book_outlined, children: [
+      SizedBox(height: 44, child: ListView(scrollDirection: Axis.horizontal, children: gap([for (final k in guide.keys) Chip2(k, on: k == tab, off: C.white, onTap: () => setState(() => tab = k))], 8))),
+      for (var i = 0; i < steps.length; i++)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          decoration: BoxDecoration(color: C.chip, borderRadius: BorderRadius.circular(20)),
-          child: Column(children: [
-            for (final r in [('Version', version), ('Made by', 'Rabby Hossain'), ('Support', Config.supportEmail), ('Website', Config.apiBase.replaceFirst('https://', ''))])
-              Container(
-                height: 46,
-                decoration: BoxDecoration(border: r.$1 == 'Website' ? null : const Border(bottom: BorderSide(color: Color(0xFFE4E2E8)))),
-                child: Row(children: [Text(r.$1, style: t(14, c: C.muted)), const Spacer(), Flexible(child: Text(r.$2, style: t(14, w: w6), overflow: TextOverflow.ellipsis))]),
-              ),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: C.white, borderRadius: BorderRadius.circular(20)),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(width: 30, height: 30, decoration: const BoxDecoration(color: C.lime, shape: BoxShape.circle), child: Center(child: Text('${i + 1}', style: t(14, w: FontWeight.w700, c: C.onLime)))),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(steps[i].$1, style: t(15, w: w6)), const SizedBox(height: 3), Text(steps[i].$2, style: t(13, c: C.muted, h: 1.45))])),
           ]),
         ),
-      ], space: 12, cross: CrossAxisAlignment.center));
+    ]);
+  }
+}
+
+// ------------------------------------------------------------------ about
+class AboutPage extends StatelessWidget {
+  final String version;
+  const AboutPage({super.key, required this.version});
+  @override
+  Widget build(BuildContext context) {
+    return AccountPage(title: 'About LifeOS', subtitle: 'LifeOS $version', icon: Icons.info_outline_rounded, children: [
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(color: C.lime, borderRadius: BorderRadius.circular(28)),
+        child: Col([
+          const LogoMark(size: 64),
+          Text('One calm place for your whole day', style: t(24, w: FontWeight.w700, c: C.onLime, ls: -0.6, h: 1.15)),
+          Text('Prayer, habits, goals, health and the people you love, in one place. Tap, don\'t type.', style: t(14, c: C.onLime, h: 1.45)),
+        ], space: 12),
+      ),
+      Row(children: gap([
+        Expanded(child: _tile('Version', version)),
+        Expanded(child: _tile('Tools', '17')),
+        Expanded(child: _tile('Made in', 'Dhaka', dark: true)),
+      ], 8)),
+      Panel(title: 'About LifeOS', child: Text('Big goals feel heavy. LifeOS breaks them into today-sized steps with dates, and keeps your faith, health, learning and family in one view. A small tick every day adds up to a big year. Your data lives on your phone and your own server, never sold.', style: t(14, h: 1.55))),
+      RowsPanel(rows: [
+        Row2(leading: Icon(Icons.person_outline_rounded, color: C.muted), title: 'Made by', right: 'Rabby Hossain'),
+        Row2(leading: Icon(Icons.mail_outline_rounded, color: C.muted), title: 'Email', right: feedbackEmail, onTap: () => launchUrl(Uri(scheme: 'mailto', path: feedbackEmail))),
+        Row2(leading: Icon(Icons.dns_outlined, color: C.muted), title: 'Your data', sub: 'Your phone + ${Config.apiBase.replaceFirst('https://', '')}'),
+        Row2(leading: Icon(Icons.verified_outlined, color: C.muted), title: 'Licenses', onTap: () => showLicensePage(context: context, applicationName: 'LifeOS', applicationVersion: version)),
+      ]),
+    ]);
+  }
+
+  Widget _tile(String k, String v, {bool dark = false}) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: dark ? C.ink : C.white, borderRadius: BorderRadius.circular(20)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(k, style: t(11, c: dark ? C.darkMuted : C.muted)), Text(v, style: t(17, w: w6, c: dark ? C.white : C.ink))]),
+      );
 }
 
 void terms(BuildContext context) {
@@ -571,56 +867,62 @@ void terms(BuildContext context) {
     ('Changes', 'If these terms change, What\'s new will say so.'),
   ];
   showSheet(context, 'Terms and conditions', (ctx, _) => Col([
-        for (final i in items) Col([Text(i.$1, style: t(15, w: w6)), Text(i.$2, style: t(14, c: const Color(0xFF3F3F46), h: 1.5))], space: 4),
+        for (final i in items) Col([Text(i.$1, style: t(15, w: w6)), Text(i.$2, style: t(14, c: C.ink.withValues(alpha: 0.8), h: 1.5))], space: 4),
       ], space: 14));
 }
 
-void feedback(BuildContext context, String version) {
+
+// ------------------------------------------------------------------ feedback
+class FeedbackPage extends StatefulWidget {
+  final String version;
+  const FeedbackPage({super.key, required this.version});
+  @override
+  State<FeedbackPage> createState() => _FeedbackPageState();
+}
+
+class _FeedbackPageState extends State<FeedbackPage> {
   final text = TextEditingController();
-  var kind = 'Idea';
-  var stars = 5;
-  showSheet(context, 'Send feedback', (ctx, set) => Col([
-        Text('What is it about?', style: t(14, w: w6)),
-        Chips(options: const ['Bug', 'Idea', 'Love it'], selected: {kind}, onTap: (v) => set(() => kind = v)),
-        Text('How do you like LifeOS?', style: t(14, w: w6)),
-        Row(children: [
+  String kind = 'Idea';
+  int stars = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    return AccountPage(title: 'Send feedback', subtitle: 'Goes to $feedbackEmail', icon: Icons.chat_bubble_outline_rounded, children: [
+      Panel(title: 'What is it about?', child: Chips(options: const ['Bug', 'Idea', 'Love it', 'Question'], selected: {kind}, onTap: (v) => setState(() => kind = v))),
+      Panel(
+        title: 'How do you like LifeOS?',
+        child: Row(children: [
           for (var i = 1; i <= 5; i++)
             Press(
-              onTap: () => set(() => stars = i),
+              onTap: () => setState(() => stars = i),
               haptic: Haptic.select,
-              scale: 0.8,
+              scale: 0.85,
               label: '$i stars',
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: AnimatedScale(
-                  scale: i <= stars ? 1 : 0.85,
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOutCubic,
-                  child: Icon(Icons.star_rounded, size: 40, color: i <= stars ? C.ink : const Color(0xFFDAD8DF)),
-                ),
-              ),
+              child: Padding(padding: const EdgeInsets.all(4), child: Icon(Icons.star_rounded, size: 40, color: i <= stars ? C.ink : C.off)),
             ),
         ]),
-        SoftField(controller: text, hint: 'Tell us what happened or what you want…', lines: 4),
-        Text('Your app version and phone are added so bugs get fixed faster.', style: t(12, c: C.muted)),
-        PressPill('Send', onTap: () async {
-          if (text.text.trim().isEmpty) {
-            say(ctx, 'Write a few words first.', good: false);
-            return;
-          }
-          final body = '${text.text.trim()}\n\n---\nType: $kind\nRating: $stars/5\nLifeOS $version\n${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
-          final uri = Uri(scheme: 'mailto', path: Config.supportEmail, query: 'subject=${Uri.encodeComponent('LifeOS $kind')}&body=${Uri.encodeComponent(body)}');
-          final ok = await launchUrl(uri);
-          if (!ctx.mounted) return;
-          if (ok) {
-            Haptic.success();
-            Navigator.pop(ctx);
-            toast(context, 'Thank you! Press send in your mail app.');
-          } else {
-            say(ctx, 'No mail app found. Email ${Config.supportEmail}.', good: false);
-          }
-        }),
-      ], space: 12));
+      ),
+      Panel(title: 'Your message', child: SoftField(controller: text, hint: 'Tell us what happened or what you want…', lines: 5)),
+      Text('Your app version and phone are added so bugs get fixed faster.', style: t(12, c: C.muted)),
+      PressPill('Send to $feedbackEmail', onTap: () async {
+        if (text.text.trim().isEmpty) {
+          say(context, 'Write a few words first.', good: false);
+          return;
+        }
+        final body = '${text.text.trim()}\n\n---\nType: $kind\nRating: $stars/5\nLifeOS ${widget.version}\n${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
+        final uri = Uri(scheme: 'mailto', path: feedbackEmail, query: 'subject=${Uri.encodeComponent('LifeOS $kind')}&body=${Uri.encodeComponent(body)}');
+        final ok = await launchUrl(uri);
+        if (!context.mounted) return;
+        if (ok) {
+          Haptic.success();
+          Navigator.pop(context);
+          toast(context, 'Thank you! Press send in your mail app.');
+        } else {
+          say(context, 'No mail app found. Email $feedbackEmail.', good: false);
+        }
+      }),
+    ]);
+  }
 }
 
 void signOutSheet(BuildContext context) {
